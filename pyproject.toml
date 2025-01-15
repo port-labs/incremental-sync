@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "azure-ingestion"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = ["lordsarcastic <adeoti.15.jude@gmail.com>"]
+
+[tool.poetry.dependencies]
+azure-identity = ">=1.19.0"
+azure-mgmt-subscription = ">=3.1.1"
+python = "^3.12"
+httpx = "^0.28.1"
+loguru = "^0.7.3"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.9.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
