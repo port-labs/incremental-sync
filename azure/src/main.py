@@ -3,8 +3,8 @@ from typing import Any, Generator
 
 import httpx
 import utils
-from client.azure_client import AzureClient
-from client.port import PortClient
+from clients.azure_client import AzureClient
+from clients.port import PortClient
 from constants import (
     CLOUD_RESOURCES_BLUEPRINT,
     INITIAL_QUERY,
