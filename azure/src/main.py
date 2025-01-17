@@ -58,7 +58,9 @@ async def main() -> None:
             )
 
         state: dict[str, Any] = state_response["entity"]
-        subs = list(azure_client.get_all_subscriptions())
+        subs = []
+        async for sub in azure_client.get_all_subscriptions():
+            subs.append(sub)
 
         subscriptions_batches: Generator[list[Subscription], None, None] = (
             utils.turn_sequence_to_chunks(
