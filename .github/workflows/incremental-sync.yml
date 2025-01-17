@@ -2,7 +2,7 @@ name: "Incremental sync of Azure resources to Port"
 on:
   schedule: # run every 15 minutes
     - cron: "*/15 * * * *"
-    
+
 jobs:
   sync:
     name: Incremental sync
@@ -12,13 +12,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      
+
       - name: Install dependencies with Poetry
         run: |
           python -m pip install --upgrade pip
           pip install poetry
           make install
-      
+
       - name: Run incremental sync
-        run: |
-          make run
+        run: make run
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
+          PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
