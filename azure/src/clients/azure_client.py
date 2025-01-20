@@ -28,6 +28,6 @@ class AzureClient:
         query = QueryRequest(subscriptions=subscriptions, query=query)
         response: list[
             dict[str, Any]
-        ] = await self.resource_g_client.resources(query).data
+        ] = await self.resource_g_client.resources(query)
         logger.info("Query ran with response: {response}")
         return response

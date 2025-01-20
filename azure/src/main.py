@@ -49,18 +49,32 @@ async def main() -> None:
         ]
         await asyncio.gather(*tasks)
 
+        logger.info(
+            "The following blueprints were initialized in Port:"
+            f" {STATE_BLUEPRINT['identifier']},"
+            f" {CLOUD_RESOURCES_BLUEPRINT['identifier']},"
+            f" {RESOURCES_GROUP_BLUEPRINT['identifier']},"
+            f" {SUBSCRIPTION_BLUEPRINT['identifier']}"
+        )
+
+        logger.info("Retrieving state from Port to determine the sync stage")
         state_response = await port_client.retrieve_data(
             STATE_BLUEPRINT["identifier"], STATE_DATA["identifier"]
         )
         if not state_response:
+            logger.info("State not found, creating initial state")
             state_response = await port_client.upsert_data(
                 STATE_BLUEPRINT["identifier"], STATE_DATA
             )
-
         state: dict[str, Any] = state_response["entity"]
+        logger.info("Sync is starting with state: {state}")
+
         subs = []
         async for sub in azure_client.get_all_subscriptions():
             subs.append(sub)
+        
+        logger.info(f"Found {len(subs)} subscriptions in Azure")
+        logger.debug(f"Subscriptions: {subs}")
 
         subscriptions_batches: Generator[list[Subscription], None, None] = (
             utils.turn_sequence_to_chunks(
@@ -76,6 +90,11 @@ async def main() -> None:
         )
 
         for subscriptions in subscriptions_batches:
+            logger.info(
+                "Running query for subscription batch with "
+                f"{len(subscriptions)} subscriptions"
+            )
+
             data = await azure_client.run_query(
                 query,
                 [s.subscription_id for s in subscriptions],  # type: ignore
@@ -83,6 +102,7 @@ async def main() -> None:
             logger.info(f"Received data: {data}")
             delete_tasks = []
             upsert_tasks = []
+
             for item in data:
                 entity = port_client.construct_resources_entity(item)
                 if item["action"] == "delete":
@@ -98,6 +118,10 @@ async def main() -> None:
                         )
                     )
 
+            logger.info(
+                f"Running {len(delete_tasks)} delete tasks "
+                f"and {len(upsert_tasks)} upsert tasks"
+            )
             await asyncio.gather(*delete_tasks)
             await asyncio.gather(*upsert_tasks)
 
