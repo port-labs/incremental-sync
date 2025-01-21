@@ -30,6 +30,10 @@ def initialize_port_client(client: httpx.AsyncClient) -> PortClient:
 
 
 async def initialize_blueprints(port_client: PortClient) -> None:
+    """
+    Create the blueprints in Port if they don't exist
+    """
+
     tasks = [
         port_client.upsert_blueprint(STATE_BLUEPRINT),
         port_client.upsert_blueprint(CLOUD_RESOURCES_BLUEPRINT),
@@ -48,6 +52,10 @@ async def initialize_blueprints(port_client: PortClient) -> None:
 
 
 async def initialize_state(port_client: PortClient) -> dict[str, Any]:
+    """
+    Retrieve the state from Port or create it if it doesn't exist
+    """
+
     logger.info("Retrieving state from Port to determine the sync stage")
     state_response = await port_client.retrieve_data(
         STATE_BLUEPRINT["identifier"], STATE_DATA["identifier"]
@@ -61,16 +69,60 @@ async def initialize_state(port_client: PortClient) -> dict[str, Any]:
     return state
 
 
+async def upsert_subscriptions(
+    subscriptions: list[Subscription], port_client: PortClient
+) -> None:
+    """
+    Constructs the subscription entities and upserts them in Port
+    """
+    logger.info(f"Upserting {len(subscriptions)} subscriptions")
+    tasks = []
+    for subscription in subscriptions:
+        entity = port_client.construct_subscription_entity(subscription)
+        tasks.append(
+            port_client.upsert_data(
+                SUBSCRIPTION_BLUEPRINT["identifier"], entity
+            )
+        )
+
+    await asyncio.gather(*tasks)
+
+
+async def upsert_resources_groups(
+    r_groups: list[tuple[str, str]], port_client: PortClient
+) -> None:
+    """
+    Constructs the resource group entities and upserts them in Port
+    """
+    tasks = []
+    for r_group in r_groups:
+        entity = port_client.construct_resource_group_entity(*r_group)
+        tasks.append(
+            port_client.upsert_data(
+                RESOURCES_GROUP_BLUEPRINT["identifier"], entity
+            )
+        )
+
+    await asyncio.gather(*tasks)
+
+
 async def process_change_items(
     items: list[dict[str, Any]], port_client: PortClient
 ) -> tuple[
     list[Coroutine[Any, Any, dict[str, Any]]],
     list[Coroutine[Any, Any, dict[str, Any]]],
 ]:
+    """
+    Processes the changes retrieved from Azure and decides 
+    whether to upsert or delete them.
+    The upserts and deletions are returned as tasks to be run concurrently.
+    """
     delete_tasks = []
     upsert_tasks = []
+    resource_groups: list[tuple[str, str]] = []
 
     for item in items:
+        resource_groups.append((item["resourceGroup"], item["subscriptionId"]))
         entity = port_client.construct_resources_entity(item)
         if item["changeType"] == "Delete":
             delete_tasks.append(
@@ -85,15 +137,22 @@ async def process_change_items(
                 )
             )
 
+    await upsert_resources_groups(resource_groups, port_client)
+
     return delete_tasks, upsert_tasks
 
 
-async def process_subscriptions(
-    subscriptions: list[Subscription],
+async def process_subscriptions_into_change_tasks(
+    subscriptions: list[str | None],
     query: str,
     azure_client: AzureClient,
     port_client: PortClient,
 ) -> None:
+    """
+    Processes the subscriptions in batches and runs the query
+    to retrieve the changes.
+    The changes are then processed into upsert and delete tasks.
+    """
     logger.info(
         "Running query for subscription batch with "
         f"{len(subscriptions)} subscriptions"
@@ -101,7 +160,7 @@ async def process_subscriptions(
 
     async for items in azure_client.run_query(
         query,
-        [s.subscription_id for s in subscriptions],  # type: ignore
+        subscriptions,  # type: ignore
     ):
         logger.info(f"Received batch of {len(items)} resource operations")
         delete_tasks, upsert_tasks = await process_change_items(
@@ -146,10 +205,15 @@ async def main() -> None:
             if state["properties"]["value"] == "INITIAL"
             else SUBSEQUENT_QUERY
         )
+        logger.info(query)
 
         for subscriptions in subscriptions_batches:
-            await process_subscriptions(
-                subscriptions, query, azure_client, port_client
+            await upsert_subscriptions(subscriptions, port_client)
+            await process_subscriptions_into_change_tasks(
+                [s.subscription_id for s in subscriptions],
+                query,
+                azure_client,
+                port_client,
             )
 
         await port_client.upsert_data(
