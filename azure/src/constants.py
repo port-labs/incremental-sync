@@ -30,7 +30,8 @@ resourcechanges
     | extend resourceId=tolower(id) 
     | project resourceId, type, name, location, tags, subscriptionId, resourceGroup 
 ) on $left.targetResourceIdCI == $right.resourceId 
-| project  subscriptionId, resourceGroup, resourceId, name, tags, type, location, changeType, changeTime
+| project  subscriptionId, resourceGroup, resourceId, name, tags, type, location, changeType, changeTime, changedProperties
+| where changedProperties contains "tags" or changedProperties contains "name"
 | order by changeTime desc
 """  # noqa E501
 
