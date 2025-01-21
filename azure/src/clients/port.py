@@ -130,7 +130,21 @@ class PortClient:
     def construct_resources_entity(
         cls, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return {}
+        return {
+            "identifier": data["resourceId"],
+            "title": data["name"],
+            "properties": {
+                "tags": data["tags"],
+                "type": data["type"],
+                "location": data["location"],
+                "changeType": data["changeType"],
+                "changeTime": data["changeTime"],
+            },
+            "relations": {
+                "subscription": data["subscriptionId"],
+                "resourceGroup": data["resourceGroup"],
+            },
+        }
 
     @classmethod
     def construct_subscription_entity(
