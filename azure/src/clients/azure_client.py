@@ -69,6 +69,8 @@ class AzureClient:
             logger.info(f"Query ran successfully with response: {response}")
             yield response.data
             skip_token = response.skip_token
+            if not skip_token:
+                break
 
     async def __aenter__(self) -> Self:
         logger.info("Initializing Azure connection resources")
