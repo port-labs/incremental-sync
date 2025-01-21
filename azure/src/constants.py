@@ -1,10 +1,12 @@
 from typing import Any
 
-INITIAL_QUERY: str = """
+from settings import app_settings
+
+INITIAL_QUERY: str = f"""
 resourcechanges 
 | extend changeTime=todatetime(properties.changeAttributes.timestamp), targetResourceId=tostring(properties.targetResourceId), changeType=tostring(properties.changeType), correlationId=properties.changeAttributes.correlationId, changedProperties=properties.changes, changeCount=properties.changeAttributes.changesCount 
 | project-away tags, name, type 
-| where changeTime < ago(15m) and (changeType == 'Delete' or changeType == 'Create' ) 
+| where changeTime < ago({app_settings.CHANGE_WINDOW_MINUTES}m) and (changeType == 'Delete' or changeType == 'Create' ) 
 | extend targetResourceIdCI=tolower(targetResourceId) 
 | summarize arg_max(changeTime, *) by targetResourceIdCI 
 | join kind=inner ( 
@@ -16,11 +18,11 @@ resourcechanges
 | order by changeTime desc
 """  # noqa E501
 
-SUBSEQUENT_QUERY: str = """
+SUBSEQUENT_QUERY: str = f"""
 resourcechanges 
 | extend changeTime=todatetime(properties.changeAttributes.timestamp), targetResourceId=tostring(properties.targetResourceId), changeType=tostring(properties.changeType), correlationId=properties.changeAttributes.correlationId, changedProperties=properties.changes, changeCount=properties.changeAttributes.changesCount 
 | project-away tags, name, type 
-| where changeTime > ago(15m)
+| where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
 | extend targetResourceIdCI=tolower(targetResourceId) 
 | summarize arg_max(changeTime, *) by targetResourceIdCI 
 | join kind=inner ( 

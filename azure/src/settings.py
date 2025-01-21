@@ -7,6 +7,8 @@ class _AppSettings(BaseSettings):
     PORT_CLIENT_ID: str
     PORT_CLIENT_SECRET: str
     PORT_API_URL: str = "https://api.getport.io/v1"
+    SUBSCRIPTION_BATCH_SIZE: int = 1000
+    CHANGE_WINDOW_MINUTES: int = 15
 
 
 app_settings = _AppSettings()
