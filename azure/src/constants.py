@@ -33,12 +33,12 @@ resourcechanges
 """  # noqa E501
 
 STATE_BLUEPRINT: dict[str, Any] = {
-    "identifier": "workflowState",
+    "identifier": "azureWorkflowState",
     "description": (
         "This blueprint represents a Container Registry"
         " Image in our software catalog"
     ),
-    "title": "Workflow State",
+    "title": "Azure Workflow State",
     "icon": "Git",
     "schema": {
         "properties": {
@@ -63,12 +63,12 @@ STATE_DATA: dict[str, Any] = {
 }
 
 CLOUD_RESOURCES_BLUEPRINT: dict[str, Any] = {
-    "identifier": "cloudResources",
+    "identifier": "azureCloudResources",
     "description": (
         "This blueprint represents an Azure"
         "Cloud Resource in our software catalog"
     ),
-    "title": "Cloud Resources",
+    "title": "Azure Cloud Resources",
     "icon": "Git",
     "schema": {
         "properties": {
@@ -104,7 +104,7 @@ RESOURCES_GROUP_BLUEPRINT: dict[str, Any] = {
         "This blueprint represents an Azure "
         "Resource Group in our software catalog"
     ),
-    "title": "Resource Group",
+    "title": "Azure Resource Group",
     "icon": "Azure",
     "schema": {
         "properties": {

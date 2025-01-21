@@ -29,15 +29,13 @@ def initialize_port_client(client: httpx.AsyncClient) -> PortClient:
     )
 
 
-def initialize_azure_client() -> AzureClient:
-    return AzureClient()
-
-
 async def main() -> None:
     logger.info("Starting Azure to Port sync")
-    async with httpx.AsyncClient(timeout=httpx.Timeout(20)) as client:
+    async with (
+        httpx.AsyncClient(timeout=httpx.Timeout(20)) as client,
+        AzureClient() as azure_client,
+    ):
         port_client = initialize_port_client(client)
-        azure_client = initialize_azure_client()
         token = await port_client.get_port_token()
         client.headers.update({"Authorization": f"Bearer {token}"})
 
@@ -67,12 +65,12 @@ async def main() -> None:
                 STATE_BLUEPRINT["identifier"], STATE_DATA
             )
         state: dict[str, Any] = state_response["entity"]
-        logger.info("Sync is starting with state: {state}")
+        logger.info(f"Sync is starting with state: {state}")
 
         subs = []
         async for sub in azure_client.get_all_subscriptions():
             subs.append(sub)
-        
+
         logger.info(f"Found {len(subs)} subscriptions in Azure")
         logger.debug(f"Subscriptions: {subs}")
 
@@ -105,7 +103,7 @@ async def main() -> None:
 
             for item in data:
                 entity = port_client.construct_resources_entity(item)
-                if item["action"] == "delete":
+                if item["changeType"] == "Delete":
                     delete_tasks.append(
                         port_client.delete_data(
                             CLOUD_RESOURCES_BLUEPRINT["identifier"], entity
