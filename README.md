@@ -25,8 +25,10 @@ Next, get your Port client ID and client secret by clicking on the three dots on
     - `AZURE_TENANT_ID` (type: str): The tenant ID of the Azure service principal.
     - `PORT_CLIENT_ID` (type: str): The client ID of the Port service principal.
     - `PORT_CLIENT_SECRET` (type: str): The client secret of the Port service principal.
-    - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is 1000.
-    - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is 15 minutes.
+    - `PORT_MAX_CONCURRENT_REQUESTS` (type: int): The maximum number of concurrent requests to Port API. Default is `10`.
+    - `PORT_API_URL` (type: str): The URL of the Port API. Default is `"https://api.getport.io/v1"`.
+    - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is `1000`.
+    - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is `15` minutes.
 
 - The GitHub workflow is defined in `.github/workflows/sync.yml`. You can modify the schedule of the workflow by changing the `cron` value.
 
@@ -49,8 +51,10 @@ make install
     - `AZURE_TENANT_ID` (type: str): The tenant ID of the Azure service principal.
     - `PORT_CLIENT_ID` (type: str): The client ID of the Port service principal.
     - `PORT_CLIENT_SECRET` (type: str): The client secret of the Port service principal.
-    - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is 1000.
-    - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is 15 minutes.
+    - `PORT_MAX_CONCURRENT_REQUESTS` (type: int): The maximum number of concurrent requests to Port API. Default is `10`.
+    - `PORT_API_URL` (type: str): The URL of the Port API. Default is `"https://api.getport.io/v1"`.
+    - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is `1000`.
+    - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is `15` minutes.
 
 - Run the script to sync the Azure resources into Port using `make run`.
 
