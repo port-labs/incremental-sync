@@ -34,20 +34,17 @@ async def initialize_blueprints(port_client: PortClient) -> None:
     Create the blueprints in Port if they don't exist
     """
 
-    tasks = [
-        port_client.upsert_blueprint(STATE_BLUEPRINT),
-        port_client.upsert_blueprint(CLOUD_RESOURCES_BLUEPRINT),
-        port_client.upsert_blueprint(RESOURCES_GROUP_BLUEPRINT),
-        port_client.upsert_blueprint(SUBSCRIPTION_BLUEPRINT),
-    ]
-    await asyncio.gather(*tasks)
+    await port_client.upsert_blueprint(SUBSCRIPTION_BLUEPRINT)
+    await port_client.upsert_blueprint(RESOURCES_GROUP_BLUEPRINT)
+    await port_client.upsert_blueprint(CLOUD_RESOURCES_BLUEPRINT)
+    await port_client.upsert_blueprint(STATE_BLUEPRINT)
 
     logger.info(
         "The following blueprints were initialized in Port:"
-        f" {STATE_BLUEPRINT['identifier']},"
-        f" {CLOUD_RESOURCES_BLUEPRINT['identifier']},"
+        f" {SUBSCRIPTION_BLUEPRINT['identifier']},"
         f" {RESOURCES_GROUP_BLUEPRINT['identifier']},"
-        f" {SUBSCRIPTION_BLUEPRINT['identifier']}"
+        f" {CLOUD_RESOURCES_BLUEPRINT['identifier']},"
+        f" {STATE_BLUEPRINT['identifier']}"
     )
 
 
@@ -113,7 +110,7 @@ async def process_change_items(
     list[Coroutine[Any, Any, dict[str, Any]]],
 ]:
     """
-    Processes the changes retrieved from Azure and decides 
+    Processes the changes retrieved from Azure and decides
     whether to upsert or delete them.
     The upserts and deletions are returned as tasks to be run concurrently.
     """
@@ -171,8 +168,8 @@ async def process_subscriptions_into_change_tasks(
             f"Running {len(delete_tasks)} delete tasks "
             f"and {len(upsert_tasks)} upsert tasks"
         )
-        await asyncio.gather(*delete_tasks)
         await asyncio.gather(*upsert_tasks)
+        await asyncio.gather(*delete_tasks)
 
 
 async def main() -> None:
@@ -190,12 +187,13 @@ async def main() -> None:
         state = await initialize_state(port_client)
         logger.info(f"Sync is starting with state: {state}")
 
-        subs = await azure_client.get_all_subscriptions()
-        logger.debug(f"Subscriptions: {subs}")
+        subscriptions = await azure_client.get_all_subscriptions()
+        logger.info(f"Discovered {len(subscriptions)} subscriptions")
+        logger.debug(f"Subscriptions: {subscriptions}")
 
         subscriptions_batches: Generator[list[Subscription], None, None] = (
             utils.turn_sequence_to_chunks(
-                subs,
+                subscriptions,
                 app_settings.SUBSCRIPTION_BATCH_SIZE,
             )
         )

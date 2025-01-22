@@ -38,8 +38,7 @@ resourcechanges
 STATE_BLUEPRINT: dict[str, Any] = {
     "identifier": "azureWorkflowState",
     "description": (
-        "This blueprint represents a Container Registry"
-        " Image in our software catalog"
+        "This blueprint represents the state of the Azure Workflow"
     ),
     "title": "Azure Workflow State",
     "icon": "Git",
