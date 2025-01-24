@@ -74,11 +74,22 @@ async def process_change_items(
 
     for item in items:
         resource_groups.append((item["resourceGroup"], item["subscriptionId"]))
-        entity = port_client.construct_resources_entity(item)
         if item["changeType"] == "Delete":
-            delete_tasks.append(port_client.delete_data(entity))
+            delete_tasks.append(
+                port_client.delete_data(
+                    port_client.construct_resources_entity(
+                        item, operation="delete"
+                    )
+                )
+            )
         else:
-            upsert_tasks.append(port_client.upsert_data(entity))
+            upsert_tasks.append(
+                port_client.upsert_data(
+                    port_client.construct_resources_entity(
+                        item, operation="upsert"
+                    )
+                )
+            )
 
     await upsert_resources_groups(resource_groups, port_client)
 

@@ -22,24 +22,91 @@ Keep the following values handy:
 
 Next, get your Port client ID and client secret by clicking on the three dots on the top right corner of the Port UI and selecting "Credentials". You will find the client ID and client secret there.
 
-#### Setting up Port webhook
+#### Configuring blueprints for Azure resources ingestion
 
-Webhooks on Port are used in this application to allow for flexible schema when ingesting Azure resources. To set up a webhook on Port, follow these steps:
-
-- From the "Builder" page, click on "Data Sources" on the left sidebar.
-- Click on "Add Data Source" and select "Webhook".
-- Fill in the required fields and click on "Create Data Source".
-- Copy the webhook URL and keep it handy.
-
-##### Configuring the webhook for Azure resources ingestion
-
-Blueprints representing Azure resources should be created in Port before syncing the Azure resources. The blueprints and webhook configuration purpose are for illustrative purposes only. You can create your own blueprints and webhook configuration based on your requirements.
-
-**Note:** The payload from the application contains a `__typename` field which is used to determine the blueprint to ingest the data into. The `__typename` field is not part of the Azure resource payload and is only present as a discriminator for the webhook.
+Blueprints representing Azure resources should be created in Port before syncing the Azure resources. The blueprints configuration are for illustrative purposes only. You can create your own blueprints configuration based on your requirements.
 
 Below are the blueprints that should be created in Port:
 
-1. `azureCloudResources` blueprint:
+1. `azureSubscription` blueprint:
+
+```json
+{
+  "identifier": "azureSubscription",
+  "title": "Azure Subscription",
+  "icon": "Azure",
+  "schema": {
+    "properties": {
+      "subscriptionId": {
+        "title": "Subscription ID",
+        "type": "string"
+      },
+      "additionalProperties": {
+        "title": "Tags",
+        "type": "object"
+      },
+      "authorizationSource": {
+        "title": "Authorization Source",
+        "type": "string"
+      },
+      "state": {
+        "title": "State",
+        "type": "string"
+      },
+      "subscriptionPolicies": {
+        "title": "Subscription Policies",
+        "type": "object"
+      }
+    },
+    "required": []
+  },
+  "mirrorProperties": {},
+  "calculationProperties": {},
+  "aggregationProperties": {},
+  "relations": {}
+}
+```
+
+2. `azureResourceGroup` blueprint:
+
+```json
+{
+  "identifier": "azureResourceGroup",
+  "description": "This blueprint represents an Azure Resource Group in our software catalog",
+  "title": "Azure Resource Group",
+  "icon": "Azure",
+  "schema": {
+    "properties": {
+      "location": {
+        "title": "Location",
+        "type": "string"
+      },
+      "provisioningState": {
+        "title": "Provisioning State",
+        "type": "string"
+      },
+      "tags": {
+        "title": "Tags",
+        "type": "object"
+      }
+    },
+    "required": []
+  },
+  "mirrorProperties": {},
+  "calculationProperties": {},
+  "aggregationProperties": {},
+  "relations": {
+    "subscription": {
+      "title": "Subscription",
+      "target": "azureSubscription",
+      "required": false,
+      "many": false
+    }
+  }
+}
+```
+
+3. `azureCloudResources` blueprint:
 
 ```json
 {
@@ -92,85 +159,18 @@ Below are the blueprints that should be created in Port:
 }
 ```
 
-2. `azureResourceGroup` blueprint:
+#### Setting up Port webhook
 
-```json
-{
-  "identifier": "azureResourceGroup",
-  "description": "This blueprint represents an Azure Resource Group in our software catalog",
-  "title": "Azure Resource Group",
-  "icon": "Azure",
-  "schema": {
-    "properties": {
-      "location": {
-        "title": "Location",
-        "type": "string"
-      },
-      "provisioningState": {
-        "title": "Provisioning State",
-        "type": "string"
-      },
-      "tags": {
-        "title": "Tags",
-        "type": "object"
-      }
-    },
-    "required": []
-  },
-  "mirrorProperties": {},
-  "calculationProperties": {},
-  "aggregationProperties": {},
-  "relations": {
-    "subscription": {
-      "title": "Subscription",
-      "target": "azureSubscription",
-      "required": false,
-      "many": false
-    }
-  }
-}
-```
+Webhooks on Port are used in this application to allow for flexible schema when ingesting Azure resources. To set up a webhook on Port, follow these steps:
 
-3. `azureSubscription` blueprint:
+- From the "Builder" page, click on "Data Sources" on the left sidebar.
+- Click on "Add Data Source" and select "Webhook".
+- Fill in the required fields and click on "Create Data Source".
+- Copy the webhook URL and keep it handy.
 
-```json
-{
-  "identifier": "azureSubscription",
-  "title": "Azure Subscription",
-  "icon": "Azure",
-  "schema": {
-    "properties": {
-      "subscriptionId": {
-        "title": "Subscription ID",
-        "type": "string"
-      },
-      "additionalProperties": {
-        "title": "Tags",
-        "type": "object"
-      },
-      "authorizationSource": {
-        "title": "Authorization Source",
-        "type": "string"
-      },
-      "state": {
-        "title": "State",
-        "type": "string"
-      },
-      "subscriptionPolicies": {
-        "title": "Subscription Policies",
-        "type": "object"
-      }
-    },
-    "required": []
-  },
-  "mirrorProperties": {},
-  "calculationProperties": {},
-  "aggregationProperties": {},
-  "relations": {}
-}
-```
+You can use the webhook mapping below to map the Azure resources to the blueprints in the `"Map the data from the external system into Port"` field. The mapping contains relevant configuration for both upsert and delete operations. The mapping is for illustrative purposes only. You can create your own mapping based on your requirements:
 
-You can use the webhook mapping below to map the Azure resources to the blueprints in Port:
+**Note:** The payload from the application contains a `__typename` field which is used to determine the blueprint to ingest the data into. The `__typename` field is not part of the Azure resource payload and is only present as a discriminator for the webhook.
 
 ```json
 [
@@ -254,12 +254,6 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
 ]
 ```
 
-The mapping contains relevant configuration for both upsert and delete operations. To use the mapping, follow these steps:
-
-- Click on the webhook you created.
-- Click on "Edit" and paste the mapping into the "Map the data from the external system into Port" field.
-- Click on "Save".
-
 ### GitHub Actions
 
 To run the application in a GitHub workflow, ensure you do the following in the GitHub workflow:
@@ -284,8 +278,44 @@ make run
 
 An example of a GitHub workflow which runs the sync every 15 minutes is shown below:
 
-```
+```yml
+name: "Incremental sync of Azure resources to Port"
+on:
+  schedule: # run every 15 minutes
+    - cron: "*/15 * * * *"
 
+jobs:
+  sync:
+    name: Incremental sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Checkout To Repository
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          repository: port-labs/incremental-sync
+
+      - name: Install dependencies with Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          make install
+
+      - name: Run incremental sync
+        run: make run
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
+          PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
+          PORT_WEBHOOK_INGEST_URL: ${{ secrets.PORT_WEBHOOK_INGEST_URL }}
+          CHANGE_WINDOW_MINUTES: 15
 ```
 
 ### Local

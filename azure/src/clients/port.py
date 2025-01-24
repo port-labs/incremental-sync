@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from loguru import logger
@@ -80,11 +80,14 @@ class PortClient:
 
     @classmethod
     def construct_resources_entity(
-        cls, data: AzureResourceQueryData
+        cls,
+        data: AzureResourceQueryData,
+        operation: Literal["upsert", "delete"],
     ) -> dict[str, Any]:
         return {
             **data,
             "__typename": "Resource",
+            "__operation": operation,
         }
 
     @classmethod
