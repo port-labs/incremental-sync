@@ -159,9 +159,8 @@ async def main() -> None:
                 port_client,
             )
 
-        logger.success("Azure to Port sync completed")
 
-    logger.info("Azure to Port sync completed")
+    logger.success("Azure to Port sync completed")
 
 
 if __name__ == "__main__":
