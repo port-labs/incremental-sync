@@ -177,10 +177,10 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureCloudResources",
     "operation": "create",
-    "filter": ".__typename == 'Resources' and .__operation == 'upsert'",
+    "filter": ".body.__typename == 'Resource' and .body.__operation == 'upsert'",
     "entity": {
       "identifier": ".body.resourceId",
-      "title": ".body.title",
+      "title": ".body.name",
       "properties": {
         "tags": ".body.tags",
         "type": ".body.type",
@@ -197,7 +197,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureCloudResources",
     "operation": "delete",
-    "filter": ".__typename == 'Resources' and .__operation == 'delete'",
+    "filter": ".body.__typename == 'Resource' and .body.__operation == 'delete'",
     "entity": {
       "identifier": ".body.resourceId"
     }
@@ -205,7 +205,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureResourceGroup",
     "operation": "create",
-    "filter": ".__typename == 'ResourceGroup' and .__operation == 'upsert'",
+    "filter": ".body.__typename == 'ResourceGroup' and .body.__operation == 'upsert'",
     "entity": {
       "identifier": ".body.name",
       "title": ".body.name",
@@ -222,7 +222,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureResourceGroup",
     "operation": "delete",
-    "filter": ".__typename == 'ResourceGroup' and .__operation == 'delete'",
+    "filter": ".body.__typename == 'ResourceGroup' and .body.__operation == 'delete'",
     "entity": {
       "identifier": ".body.name"
     }
@@ -230,7 +230,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureSubscription",
     "operation": "create",
-    "filter": ".__typename == 'Subscription' and .__operation == 'upsert'",
+    "filter": ".body.__typename == 'Subscription' and .body.__operation == 'upsert'",
     "entity": {
       "identifier": ".body.id",
       "title": ".body.displayName",
@@ -246,7 +246,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureSubscription",
     "operation": "delete",
-    "filter": ".__typename == 'Subscription' and .__operation == 'delete'",
+    "filter": ".body.__typename == 'Subscription' and .body.__operation == 'delete'",
     "entity": {
       "identifier": ".body.id"
     }
