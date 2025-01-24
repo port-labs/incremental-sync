@@ -4,7 +4,7 @@ QUERY: str = f"""
 resourcechanges 
 | extend changeTime=todatetime(properties.changeAttributes.timestamp), targetResourceId=tostring(properties.targetResourceId), changeType=tostring(properties.changeType), correlationId=properties.changeAttributes.correlationId, changedProperties=properties.changes, changeCount=properties.changeAttributes.changesCount 
 | project-away tags, name, type 
-| where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
+| where changeTime < ago({app_settings.CHANGE_WINDOW_MINUTES}m)
 | extend targetResourceIdCI=tolower(targetResourceId) 
 | summarize arg_max(changeTime, *) by targetResourceIdCI 
 | join kind=inner ( 
