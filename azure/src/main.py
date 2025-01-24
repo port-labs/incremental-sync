@@ -139,7 +139,6 @@ async def main() -> None:
 
         subscriptions = await azure_client.get_all_subscriptions()
         logger.info(f"Discovered {len(subscriptions)} subscriptions")
-        logger.debug(f"Subscriptions: {subscriptions}")
 
         subscriptions_batches: Generator[list[Subscription], None, None] = (
             utils.turn_sequence_to_chunks(

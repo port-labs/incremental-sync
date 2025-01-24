@@ -26,7 +26,7 @@ Next, get your Port client ID and client secret by clicking on the three dots on
 
 Blueprints representing Azure resources should be created in Port before syncing the Azure resources. The blueprints configuration are for illustrative purposes only. You can create your own blueprints configuration based on your requirements.
 
-Below are the blueprints that should be created in Port:
+Below are the blueprint examples that should be created in Port:
 
 1. `azureSubscription` blueprint:
 
