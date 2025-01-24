@@ -1,9 +1,9 @@
-import asyncio
 from typing import Any
 
 import httpx
 from loguru import logger
 from settings import app_settings
+from utils import AzureResourceQueryData
 
 from azure.mgmt.subscription.models._models_py3 import Subscription
 
@@ -20,9 +20,6 @@ class PortClient:
         self.client_secret = client_secret
         self.api_url = api_url
         self.http_client = http_client
-        self._sephamore = asyncio.Semaphore(
-            app_settings.PORT_MAX_CONCURRENT_REQUESTS
-        )
 
     @classmethod
     def _handle_error(cls, response: httpx.Response) -> None:
@@ -39,78 +36,28 @@ class PortClient:
     async def _send_request(
         self, method: str, url: str, handle_error: bool = True, **kwargs: Any
     ) -> httpx.Response:
-        async with self._sephamore:
-            response = await self.http_client.request(method, url, **kwargs)
-            if handle_error:
-                self._handle_error(response)
-            return response
+        response = await self.http_client.request(method, url, **kwargs)
+        if handle_error:
+            self._handle_error(response)
+        return response
 
-    async def get_port_token(self) -> str:
-        logger.info("Getting Port token")
-        response = await self._send_request(
+    async def upsert_data(self, data: dict[str, Any]) -> None:
+        logger.info("Sending upsert request to webhook")
+        await self._send_request(
             "post",
-            f"{self.api_url}/auth/access_token",
-            data={
-                "clientId": self.client_id,
-                "clientSecret": self.client_secret,
-            },
-        )
-        logger.info("Retrieved Port token successfully")
-        result: dict[str, str] = response.json()
-        return result["accessToken"]
-
-    async def upsert_blueprint(self, data: dict[str, Any]) -> dict[str, Any]:
-        logger.info(f"Upserting blueprint {data['identifier']}")
-
-        if blueprint := await self.get_blueprint(data["identifier"]):
-            logger.info(
-                f"Blueprint {data['identifier']}"
-                "already exists, skipping creation"
-            )
-
-            return blueprint
-
-        response = await self._send_request(
-            "post",
-            f"{self.api_url}/blueprints",
+            app_settings.PORT_WEBHOOK_INGEST_URL,
             json=data,
         )
-        logger.info(f"Upserted blueprint {data['identifier']} successfully")
-        result: dict[str, Any] = response.json()
-        return result
+        logger.info("Sent data to webhook successfully")
 
-    async def get_blueprint(self, blueprint: str) -> dict[str, Any]:
-        logger.info(f"Getting blueprint {blueprint}")
-
-        response = await self._send_request(
-            method="get",
-            url=f"{self.api_url}/blueprints/{blueprint}",
-            handle_error=False,
-        )
-        if response.status_code == 404:
-            logger.info(f"No blueprint found for {blueprint}")
-            return {}
-
-        self._handle_error(response)
-        logger.info(f"Retrieved blueprint {blueprint} successfully")
-        result: dict[str, Any] = response.json()
-        return result
-
-    async def upsert_data(
-        self, blueprint: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
-        logger.info(f"Upserting blueprint {blueprint} with data {data}")
-        response = await self._send_request(
-            "post",
-            (
-                f"{self.api_url}/blueprints/{blueprint}/entities"
-                "?upsert=true&merge=true&create_missing_related_entities=true"
-            ),
+    async def delete_data(self, data: dict[str, Any]) -> None:
+        logger.info("Sending delete request to webhook")
+        await self._send_request(
+            "delete",
+            app_settings.PORT_WEBHOOK_INGEST_URL,
             json=data,
         )
-        logger.info(f"Upserted blueprint {blueprint} successfully")
-        result: dict[str, Any] = response.json()
-        return result
+        logger.info("Sent delete request to webhook successfully")
 
     async def retrieve_data(
         self, blueprint: str, id: str
@@ -131,40 +78,13 @@ class PortClient:
         result: dict[str, Any] = response.json()
         return result
 
-    async def delete_data(
-        self, blueprint: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
-        logger.info(f"Deleting blueprint {blueprint} with data {data}")
-        response = await self._send_request(
-            "post",
-            (
-                f"{self.api_url}/blueprints/{blueprint}"
-                "/entities?delete_dependents=false"
-            ),
-            json=data,
-        )
-        logger.info(f"Deleted blueprint {blueprint} successfully")
-        result: dict[str, Any] = response.json()
-        return result
-
     @classmethod
     def construct_resources_entity(
-        cls, data: dict[str, Any]
+        cls, data: AzureResourceQueryData
     ) -> dict[str, Any]:
         return {
-            "identifier": data["resourceId"],
-            "title": data["name"],
-            "properties": {
-                "tags": data["tags"],
-                "type": data["type"],
-                "location": data["location"],
-                "changeType": data["changeType"],
-                "changeTime": data["changeTime"],
-            },
-            "relations": {
-                "subscription": data["subscriptionId"],
-                "resourceGroup": data["resourceGroup"],
-            },
+            **data,
+            "__typename": "Resource",
         }
 
     @classmethod
@@ -172,9 +92,21 @@ class PortClient:
         cls, data: Subscription
     ) -> dict[str, Any]:
         return {
-            "identifier": data.subscription_id,
-            "title": data.display_name,
-            "properties": {"tags": data.additional_properties},
+            "id": data.id,
+            "subscriptionId": data.subscription_id,
+            "displayName": data.display_name,
+            "additionalProperties": data.additional_properties,
+            "authorizationSource": data.authorization_source,
+            "state": data.state,
+            "subscriptionPolicies": data.subscription_policies
+            and {
+                "locationPlacementId": (
+                    data.subscription_policies.location_placement_id
+                ),
+                "quotaId": data.subscription_policies.quota_id,
+                "spendingLimit": data.subscription_policies.spending_limit,
+            },
+            "__typename": "Subscription",
         }
 
     @classmethod
@@ -182,7 +114,7 @@ class PortClient:
         cls, name: str, subscription_id: str
     ) -> dict[str, Any]:
         return {
-            "identifier": name,
-            "title": name,
-            "relations": {"subscription": subscription_id},
+            "name": name,
+            "subscriptionId": subscription_id,
+            "__typename": "ResourceGroup",
         }

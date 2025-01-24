@@ -1,4 +1,4 @@
-from typing import Generator, TypeVar
+from typing import Any, Generator, TypedDict, TypeVar
 
 T = TypeVar("T")
 
@@ -18,3 +18,16 @@ def turn_sequence_to_chunks(
         end += chunk_size
 
     return
+
+
+class AzureResourceQueryData(TypedDict):
+    subscriptionId: str
+    resourceGroup: str
+    resourceId: str
+    name: str
+    tags: dict[str, Any]
+    type: str
+    location: str
+    changeType: str
+    changeTime: str
+    changedProperties: dict[str, Any]

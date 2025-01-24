@@ -5,17 +5,10 @@ import httpx
 import utils
 from clients.azure_client import AzureClient
 from clients.port import PortClient
-from constants import (
-    CLOUD_RESOURCES_BLUEPRINT,
-    INITIAL_QUERY,
-    RESOURCES_GROUP_BLUEPRINT,
-    STATE_BLUEPRINT,
-    STATE_DATA,
-    SUBSCRIPTION_BLUEPRINT,
-    SUBSEQUENT_QUERY,
-)
+from constants import QUERY
 from loguru import logger
 from settings import app_settings
+from utils import AzureResourceQueryData
 
 from azure.mgmt.subscription.models._models_py3 import Subscription
 
@@ -29,43 +22,6 @@ def initialize_port_client(client: httpx.AsyncClient) -> PortClient:
     )
 
 
-async def initialize_blueprints(port_client: PortClient) -> None:
-    """
-    Create the blueprints in Port if they don't exist
-    """
-
-    await port_client.upsert_blueprint(SUBSCRIPTION_BLUEPRINT)
-    await port_client.upsert_blueprint(RESOURCES_GROUP_BLUEPRINT)
-    await port_client.upsert_blueprint(CLOUD_RESOURCES_BLUEPRINT)
-    await port_client.upsert_blueprint(STATE_BLUEPRINT)
-
-    logger.info(
-        "The following blueprints were initialized in Port:"
-        f" {SUBSCRIPTION_BLUEPRINT['identifier']},"
-        f" {RESOURCES_GROUP_BLUEPRINT['identifier']},"
-        f" {CLOUD_RESOURCES_BLUEPRINT['identifier']},"
-        f" {STATE_BLUEPRINT['identifier']}"
-    )
-
-
-async def initialize_state(port_client: PortClient) -> dict[str, Any]:
-    """
-    Retrieve the state from Port or create it if it doesn't exist
-    """
-
-    logger.info("Retrieving state from Port to determine the sync stage")
-    state_response = await port_client.retrieve_data(
-        STATE_BLUEPRINT["identifier"], STATE_DATA["identifier"]
-    )
-    if not state_response:
-        logger.info("State not found, creating initial state")
-        state_response = await port_client.upsert_data(
-            STATE_BLUEPRINT["identifier"], STATE_DATA
-        )
-    state: dict[str, Any] = state_response["entity"]
-    return state
-
-
 async def upsert_subscriptions(
     subscriptions: list[Subscription], port_client: PortClient
 ) -> None:
@@ -73,14 +29,13 @@ async def upsert_subscriptions(
     Constructs the subscription entities and upserts them in Port
     """
     logger.info(f"Upserting {len(subscriptions)} subscriptions")
-    tasks = []
-    for subscription in subscriptions:
-        entity = port_client.construct_subscription_entity(subscription)
-        tasks.append(
-            port_client.upsert_data(
-                SUBSCRIPTION_BLUEPRINT["identifier"], entity
-            )
+    tasks: list[Coroutine[Any, Any, None]] = []
+    tasks.extend(
+        port_client.upsert_data(
+            port_client.construct_subscription_entity(subscription),
         )
+        for subscription in subscriptions
+    )
 
     await asyncio.gather(*tasks)
 
@@ -91,23 +46,22 @@ async def upsert_resources_groups(
     """
     Constructs the resource group entities and upserts them in Port
     """
-    tasks = []
-    for r_group in r_groups:
-        entity = port_client.construct_resource_group_entity(*r_group)
-        tasks.append(
-            port_client.upsert_data(
-                RESOURCES_GROUP_BLUEPRINT["identifier"], entity
-            )
+    tasks: list[Coroutine[Any, Any, None]] = []
+    tasks.extend(
+        port_client.upsert_data(
+            port_client.construct_resource_group_entity(*r_group)
         )
+        for r_group in r_groups
+    )
 
     await asyncio.gather(*tasks)
 
 
 async def process_change_items(
-    items: list[dict[str, Any]], port_client: PortClient
+    items: list[AzureResourceQueryData], port_client: PortClient
 ) -> tuple[
-    list[Coroutine[Any, Any, dict[str, Any]]],
-    list[Coroutine[Any, Any, dict[str, Any]]],
+    list[Coroutine[Any, Any, None]],
+    list[Coroutine[Any, Any, None]],
 ]:
     """
     Processes the changes retrieved from Azure and decides
@@ -122,17 +76,9 @@ async def process_change_items(
         resource_groups.append((item["resourceGroup"], item["subscriptionId"]))
         entity = port_client.construct_resources_entity(item)
         if item["changeType"] == "Delete":
-            delete_tasks.append(
-                port_client.delete_data(
-                    CLOUD_RESOURCES_BLUEPRINT["identifier"], entity
-                )
-            )
+            delete_tasks.append(port_client.delete_data(entity))
         else:
-            upsert_tasks.append(
-                port_client.upsert_data(
-                    CLOUD_RESOURCES_BLUEPRINT["identifier"], entity
-                )
-            )
+            upsert_tasks.append(port_client.upsert_data(entity))
 
     await upsert_resources_groups(resource_groups, port_client)
 
@@ -179,13 +125,6 @@ async def main() -> None:
         AzureClient() as azure_client,
     ):
         port_client = initialize_port_client(client)
-        token = await port_client.get_port_token()
-        client.headers.update({"Authorization": f"Bearer {token}"})
-
-        await initialize_blueprints(port_client)
-
-        state = await initialize_state(port_client)
-        logger.info(f"Sync is starting with state: {state}")
 
         subscriptions = await azure_client.get_all_subscriptions()
         logger.info(f"Discovered {len(subscriptions)} subscriptions")
@@ -198,12 +137,7 @@ async def main() -> None:
             )
         )
 
-        query = (
-            INITIAL_QUERY
-            if state["properties"]["value"] == "INITIAL"
-            else SUBSEQUENT_QUERY
-        )
-        logger.info(query)
+        query = QUERY
 
         for subscriptions in subscriptions_batches:
             await upsert_subscriptions(subscriptions, port_client)
@@ -214,10 +148,7 @@ async def main() -> None:
                 port_client,
             )
 
-        await port_client.upsert_data(
-            STATE_BLUEPRINT["identifier"],
-            {**state, "properties": {"value": "SUBSEQUENT"}},
-        )
+        logger.success("Azure to Port sync completed")
 
     logger.info("Azure to Port sync completed")
 
