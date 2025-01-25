@@ -24,7 +24,7 @@ Next, get your Port client ID and client secret by clicking on the three dots on
 
 #### Configuring blueprints for Azure resources ingestion
 
-Blueprints representing Azure resources should be created in Port before syncing the Azure resources. The blueprints configuration are for illustrative purposes only. You can create your own blueprints configuration based on your requirements.
+Blueprints representing Azure resources should be created in Port before syncing the Azure resources. The blueprints configuration below are for illustrative purposes only. You can create your own blueprints configuration based on your requirements.
 
 Below are the blueprint examples that should be created in Port:
 
@@ -170,7 +170,7 @@ Webhooks on Port are used in this application to allow for flexible schema when 
 
 You can use the webhook mapping below to map the Azure resources to the blueprints in the `"Map the data from the external system into Port"` field. The mapping contains relevant configuration for both upsert and delete operations. The mapping is for illustrative purposes only. You can create your own mapping based on your requirements:
 
-**Note:** The payload from the application contains a `__typename` field which is used to determine the blueprint to ingest the data into. The `__typename` field is not part of the Azure resource payload and is only present as a discriminator for the webhook.
+**Note:** The payload from the application contains a `__typename` field which is used to determine the blueprint to ingest the data into with possible values: `Subscription`, `Resource` and `ResourceGroup`, and a `__operation` field depicting what type of operation is to be performed, whether `upsert` or `delete`. The `__typename` field is not part of the Azure resource payload and is only present as a discriminator for the webhook.
 
 ```json
 [
