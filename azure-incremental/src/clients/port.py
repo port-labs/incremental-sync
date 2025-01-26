@@ -11,6 +11,7 @@ class PortClient:
     ) -> None:
         self.http_client = http_client
         self.webhook_ingest_url = app_settings.PORT_WEBHOOK_INGEST_URL
+        self.webhook_secret = app_settings.PORT_WEBHOOK_SECRET
 
     @classmethod
     def _handle_error(cls, response: httpx.Response) -> None:

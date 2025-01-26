@@ -31,5 +31,6 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
+          PORT_WEBHOOK_INGEST_URL: ${{ secrets.PORT_WEBHOOK_INGEST_URL }}
+          PORT_WEBHOOK_SECRET: ${{ secrets.PORT_WEBHOOK_SECRET }}
           PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}

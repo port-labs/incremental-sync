@@ -174,7 +174,6 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
       },
       "relations": {
         "subscription": ".body.data.subscriptionId",
-        "resourceGroup": ".body.data.resourceGroup"
       }
     }
   },

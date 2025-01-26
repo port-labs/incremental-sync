@@ -11,4 +11,4 @@ lint:
 	@poetry run mypy .
 
 run:
-	@poetry run python azure/src/main.py
+	@poetry run python azure-incremental/src/main.py

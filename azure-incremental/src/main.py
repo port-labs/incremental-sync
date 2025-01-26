@@ -5,7 +5,7 @@ import httpx
 import utils
 from clients.azure_client import AzureClient
 from clients.port import PortClient
-from constants import QUERY
+from queries import RESOURCE_CHANGES_QUERY
 from loguru import logger
 from settings import app_settings
 
@@ -31,6 +31,7 @@ async def upsert_subscriptions(
     )
 
     await asyncio.gather(*tasks)
+
 
 async def process_change_items(
     items: list[dict[str, Any]], port_client: PortClient
@@ -127,7 +128,7 @@ async def main() -> None:
             )
         )
 
-        query = QUERY
+        query = RESOURCE_CHANGES_QUERY
 
         for subscriptions in subscriptions_batches:
             await upsert_subscriptions(subscriptions, port_client)
