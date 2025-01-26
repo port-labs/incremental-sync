@@ -2,7 +2,7 @@ import asyncio
 from typing import Any, AsyncGenerator, Self
 
 from loguru import logger
-from rate_limiter import TokenBucketRateLimiter
+from src.rate_limiter import TokenBucketRateLimiter
 
 from azure.identity.aio import DefaultAzureCredential
 from azure.mgmt.resourcegraph.aio import ResourceGraphClient  # type: ignore
@@ -48,13 +48,14 @@ class AzureClient:
         self, query: str, subscriptions: list[str]
     ) -> AsyncGenerator[list[dict[str, Any]], None]:
         logger.info("Running query")
+        logger.debug(f"{query}")
         if not self.resource_g_client:
             raise ValueError("Azure client not initialized")
 
         skip_token: str | None = None
 
         while True:
-            query = QueryRequest(
+            query_request = QueryRequest(
                 subscriptions=subscriptions,
                 query=query,
                 options=QueryRequestOptions(
@@ -63,14 +64,16 @@ class AzureClient:
             )
             await self._handle_rate_limit(self._rate_limiter.consume(1))
             response: QueryResponse = await self.resource_g_client.resources(
-                query
+                query_request
             )
 
-            logger.info(f"Query ran successfully with response: {response}")
+            logger.info(f"Query ran successfully")
             yield response.data
             skip_token = response.skip_token
             if not skip_token:
+                logger.info("No more data to fetch")
                 break
+            logger.info("Fetching more data")
 
     async def __aenter__(self) -> Self:
         logger.info("Initializing Azure connection resources")
