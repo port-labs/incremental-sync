@@ -41,6 +41,10 @@ Below are the blueprint examples that should be created in Port:
         "title": "Subscription ID",
         "type": "string"
       },
+      "tags": {
+        "title": "Tags",
+        "type": "object"
+      },
       "additionalProperties": {
         "title": "Tags",
         "type": "object"
@@ -79,10 +83,6 @@ Below are the blueprint examples that should be created in Port:
     "properties": {
       "location": {
         "title": "Location",
-        "type": "string"
-      },
-      "provisioningState": {
-        "title": "Provisioning State",
         "type": "string"
       },
       "tags": {
@@ -127,14 +127,6 @@ Below are the blueprint examples that should be created in Port:
       "location": {
         "title": "Location",
         "type": "string"
-      },
-      "changeType": {
-        "title": "Change Type",
-        "type": "string"
-      },
-      "changeTime": {
-        "title": "Change Time",
-        "type": "string"
       }
     },
     "required": []
@@ -146,12 +138,6 @@ Below are the blueprint examples that should be created in Port:
     "resourceGroup": {
       "title": "Resource Group",
       "target": "azureResourceGroup",
-      "required": true,
-      "many": false
-    },
-    "subscription": {
-      "title": "Subscription",
-      "target": "azureSubscription",
       "required": true,
       "many": false
     }
@@ -177,78 +163,51 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
   {
     "blueprint": "azureCloudResources",
     "operation": "create",
-    "filter": ".body.__typename == 'Resource' and .body.__operation == 'upsert'",
+    "filter": ".body.type == 'resource' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.resourceId",
-      "title": ".body.name",
+      "identifier": ".body.data.resourceId",
+      "title": ".body.data.name",
       "properties": {
-        "tags": ".body.tags",
-        "type": ".body.type",
-        "location": ".body.location",
-        "changeType": ".body.changeType",
-        "changeTime": ".body.changeTime"
+        "tags": ".body.data.tags",
+        "type": ".body.data.type",
+        "location": ".body.data.location",
       },
       "relations": {
-        "subscription": ".body.subscriptionId",
-        "resourceGroup": ".body.resourceGroup"
+        "subscription": ".body.data.subscriptionId",
+        "resourceGroup": ".body.data.resourceGroup"
       }
     }
   },
   {
     "blueprint": "azureCloudResources",
     "operation": "delete",
-    "filter": ".body.__typename == 'Resource' and .body.__operation == 'delete'",
+    "filter": ".body.type == 'resource' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.resourceId"
-    }
-  },
-  {
-    "blueprint": "azureResourceGroup",
-    "operation": "create",
-    "filter": ".body.__typename == 'ResourceGroup' and .body.__operation == 'upsert'",
-    "entity": {
-      "identifier": ".body.name",
-      "title": ".body.name",
-      "properties": {
-        "tags": ".body.tags",
-        "provisioningState": ".body.provisioningState",
-        "location": ".body.location"
-      },
-      "relations": {
-        "subscription": ".body.subscriptionId"
-      }
-    }
-  },
-  {
-    "blueprint": "azureResourceGroup",
-    "operation": "delete",
-    "filter": ".body.__typename == 'ResourceGroup' and .body.__operation == 'delete'",
-    "entity": {
-      "identifier": ".body.name"
+      "identifier": ".body.data.resourceId"
     }
   },
   {
     "blueprint": "azureSubscription",
     "operation": "create",
-    "filter": ".body.__typename == 'Subscription' and .body.__operation == 'upsert'",
+    "filter": ".body.type == 'subscription' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.id",
-      "title": ".body.displayName",
+      "identifier": ".body.data.id",
+      "title": ".body.data.displayName",
       "properties": {
-        "subscriptionId": ".body.subscriptionId",
-        "additionalProperties": ".body.additionalProperties",
-        "authorizationSource": ".body.authorizationSource",
-        "state": ".body.state",
-        "subscriptionPolicies": ".body.subscriptionPolicies"
+        "subscriptionId": ".body.data.subscriptionId",
+        "additionalProperties": ".body.data.additionalProperties",
+        "authorizationSource": ".body.data.authorizationSource",
+        "state": ".body.data.state",
+        "subscriptionPolicies": ".body.data.subscriptionPolicies"
       }
     }
   },
   {
     "blueprint": "azureSubscription",
     "operation": "delete",
-    "filter": ".body.__typename == 'Subscription' and .body.__operation == 'delete'",
+    "filter": ".body.type == 'subscription' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.id"
+      "identifier": ".body.data.id"
     }
   }
 ]
@@ -263,10 +222,9 @@ To run the application in a GitHub workflow, ensure you do the following in the 
   - `AZURE_CLIENT_ID` (type: str): The client ID of the Azure service principal.
   - `AZURE_CLIENT_SECRET` (type: str): The client secret of the Azure service principal.
   - `AZURE_TENANT_ID` (type: str): The tenant ID of the Azure service principal.
-  - `PORT_CLIENT_ID` (type: str): The client ID of the Port service principal.
-  - `PORT_CLIENT_SECRET` (type: str): The client secret of the Port service principal.
   - `PORT_WEBHOOK_INGEST_URL` (type: str): The webhook URL to ingest the Azure resources into Port.
-  - `PORT_API_URL` (type: str): The URL of the Port API. Default is `"https://api.getport.io/v1"`.
+
+Additional environment variables:
   - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is `1000` which is also the maximum size.
   - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is `15` minutes.
 
@@ -312,8 +270,6 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
-          PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
           PORT_WEBHOOK_INGEST_URL: ${{ secrets.PORT_WEBHOOK_INGEST_URL }}
           CHANGE_WINDOW_MINUTES: 15
 ```
@@ -333,10 +289,9 @@ make install
   - `AZURE_CLIENT_ID` (type: str): The client ID of the Azure service principal.
   - `AZURE_CLIENT_SECRET` (type: str): The client secret of the Azure service principal.
   - `AZURE_TENANT_ID` (type: str): The tenant ID of the Azure service principal.
-  - `PORT_CLIENT_ID` (type: str): The client ID of the Port service principal.
-  - `PORT_CLIENT_SECRET` (type: str): The client secret of the Port service principal.
   - `PORT_WEBHOOK_INGEST_URL` (type: str): The webhook URL to ingest the Azure resources into Port.
-  - `PORT_API_URL` (type: str): The URL of the Port API. Default is `"https://api.getport.io/v1"`.
+
+Additional environment variables:
   - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is `1000` which is also the maximum size.
   - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is `15` minutes.
 

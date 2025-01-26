@@ -3,7 +3,6 @@ from typing import Any, AsyncGenerator, Self
 
 from loguru import logger
 from rate_limiter import TokenBucketRateLimiter
-from utils import AzureResourceQueryData
 
 from azure.identity.aio import DefaultAzureCredential
 from azure.mgmt.resourcegraph.aio import ResourceGraphClient  # type: ignore
@@ -47,7 +46,7 @@ class AzureClient:
 
     async def run_query(
         self, query: str, subscriptions: list[str]
-    ) -> AsyncGenerator[list[AzureResourceQueryData], None]:
+    ) -> AsyncGenerator[list[dict[str, Any]], None]:
         logger.info("Running query")
         if not self.resource_g_client:
             raise ValueError("Azure client not initialized")

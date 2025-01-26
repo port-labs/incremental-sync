@@ -8,18 +8,8 @@ from clients.port import PortClient
 from constants import QUERY
 from loguru import logger
 from settings import app_settings
-from utils import AzureResourceQueryData
 
 from azure.mgmt.subscription.models._models_py3 import Subscription
-
-
-def initialize_port_client(client: httpx.AsyncClient) -> PortClient:
-    return PortClient(
-        client,
-        app_settings.PORT_CLIENT_ID,
-        app_settings.PORT_CLIENT_SECRET,
-        app_settings.PORT_API_URL,
-    )
 
 
 async def upsert_subscriptions(
@@ -31,34 +21,19 @@ async def upsert_subscriptions(
     logger.info(f"Upserting {len(subscriptions)} subscriptions")
     tasks: list[Coroutine[Any, Any, None]] = []
     tasks.extend(
-        port_client.upsert_data(
-            port_client.construct_subscription_entity(subscription),
+        port_client.send_webhook_data(
+            subscription.as_dict(),
+            id=subscription.id,
+            operation="upsert",
+            type="subscription",
         )
         for subscription in subscriptions
     )
 
     await asyncio.gather(*tasks)
 
-
-async def upsert_resources_groups(
-    r_groups: list[tuple[str, str]], port_client: PortClient
-) -> None:
-    """
-    Constructs the resource group entities and upserts them in Port
-    """
-    tasks: list[Coroutine[Any, Any, None]] = []
-    tasks.extend(
-        port_client.upsert_data(
-            port_client.construct_resource_group_entity(*r_group)
-        )
-        for r_group in r_groups
-    )
-
-    await asyncio.gather(*tasks)
-
-
 async def process_change_items(
-    items: list[AzureResourceQueryData], port_client: PortClient
+    items: list[dict[str, Any]], port_client: PortClient
 ) -> tuple[
     list[Coroutine[Any, Any, None]],
     list[Coroutine[Any, Any, None]],
@@ -70,34 +45,32 @@ async def process_change_items(
     """
     delete_tasks = []
     upsert_tasks = []
-    resource_groups: list[tuple[str, str]] = []
 
     for item in items:
-        resource_groups.append((item["resourceGroup"], item["subscriptionId"]))
         if item["changeType"] == "Delete":
             delete_tasks.append(
-                port_client.delete_data(
-                    port_client.construct_resources_entity(
-                        item, operation="delete"
-                    )
+                port_client.send_webhook_data(
+                    data=item,
+                    id=item["resourceId"],
+                    operation="delete",
+                    type="resource",
                 )
             )
         else:
             upsert_tasks.append(
-                port_client.upsert_data(
-                    port_client.construct_resources_entity(
-                        item, operation="upsert"
-                    )
+                port_client.send_webhook_data(
+                    data=item,
+                    id=item["resourceId"],
+                    operation="upsert",
+                    type="resource",
                 )
             )
-
-    await upsert_resources_groups(resource_groups, port_client)
 
     return delete_tasks, upsert_tasks
 
 
 async def process_subscriptions_into_change_tasks(
-    subscriptions: list[str | None],
+    subscriptions: list[str],
     query: str,
     azure_client: AzureClient,
     port_client: PortClient,
@@ -114,9 +87,12 @@ async def process_subscriptions_into_change_tasks(
 
     async for items in azure_client.run_query(
         query,
-        subscriptions,  # type: ignore
+        subscriptions,
     ):
         logger.info(f"Received batch of {len(items)} resource operations")
+        if not items:
+            logger.info("No changes found in this batch")
+            continue
         delete_tasks, upsert_tasks = await process_change_items(
             items, port_client
         )
@@ -135,14 +111,18 @@ async def main() -> None:
         httpx.AsyncClient(timeout=httpx.Timeout(20)) as client,
         AzureClient() as azure_client,
     ):
-        port_client = initialize_port_client(client)
+        port_client = PortClient(client)
 
-        subscriptions = await azure_client.get_all_subscriptions()
-        logger.info(f"Discovered {len(subscriptions)} subscriptions")
+        all_subscriptions = await azure_client.get_all_subscriptions()
+        logger.info(f"Discovered {len(all_subscriptions)} subscriptions")
+
+        if not all_subscriptions:
+            logger.error("No subscriptions found in Azure, exiting")
+            return
 
         subscriptions_batches: Generator[list[Subscription], None, None] = (
             utils.turn_sequence_to_chunks(
-                subscriptions,
+                all_subscriptions,
                 app_settings.SUBSCRIPTION_BATCH_SIZE,
             )
         )
@@ -157,7 +137,6 @@ async def main() -> None:
                 azure_client,
                 port_client,
             )
-
 
     logger.success("Azure to Port sync completed")
 
