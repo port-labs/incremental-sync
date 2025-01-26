@@ -44,22 +44,6 @@ Below are the blueprint examples that should be created in Port:
       "tags": {
         "title": "Tags",
         "type": "object"
-      },
-      "additionalProperties": {
-        "title": "Tags",
-        "type": "object"
-      },
-      "authorizationSource": {
-        "title": "Authorization Source",
-        "type": "string"
-      },
-      "state": {
-        "title": "State",
-        "type": "string"
-      },
-      "subscriptionPolicies": {
-        "title": "Subscription Policies",
-        "type": "object"
       }
     },
     "required": []
@@ -173,7 +157,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
         "location": ".body.data.location",
       },
       "relations": {
-        "subscription": ".body.data.subscriptionId",
+        "resourceGroup": ".body.data.resourceGroup"
       }
     }
   },
@@ -186,27 +170,48 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     }
   },
   {
+    "blueprint": "azureResourceGroup",
+    "operation": "create",
+    "filter": ".body.data.type == 'microsoft.resources/subscriptions/resourcegroups' and .body.operation == 'upsert'",
+    "entity": {
+      "identifier": ".body.data.resourceId",
+      "title": ".body.data.name",
+      "properties": {
+        "tags": ".body.data.tags",
+        "location": ".body.data.location"
+      },
+      "relations": {
+        "subscription": ".body.data.subscriptionId"
+      }
+    }
+  },
+  {
+    "blueprint": "azureResourceGroup",
+    "operation": "delete",
+    "filter": ".body.data.type == 'microsoft.resources/subscriptions/resourcegroups' and .body.operation == 'delete'",
+    "entity": {
+      "identifier": ".body.data.resourceId"
+    }
+  },
+  {
     "blueprint": "azureSubscription",
     "operation": "create",
-    "filter": ".body.type == 'subscription' and .body.operation == 'upsert'",
+    "filter": ".body.data.type == 'microsoft.resources/subscriptions' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.id",
-      "title": ".body.data.displayName",
+      "identifier": ".body.data.resourceId",
+      "title": ".body.data.name",
       "properties": {
         "subscriptionId": ".body.data.subscriptionId",
-        "additionalProperties": ".body.data.additionalProperties",
-        "authorizationSource": ".body.data.authorizationSource",
-        "state": ".body.data.state",
-        "subscriptionPolicies": ".body.data.subscriptionPolicies"
+        "tags": ".body.data.tags",
       }
     }
   },
   {
     "blueprint": "azureSubscription",
     "operation": "delete",
-    "filter": ".body.type == 'subscription' and .body.operation == 'delete'",
+    "filter": ".body.data.type == 'microsoft.resources/subscriptions' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.id"
+      "identifier": ".body.data.resourceId"
     }
   }
 ]
@@ -259,12 +264,15 @@ jobs:
 
       - name: Install dependencies with Poetry
         run: |
+          cd integrations/azure_incremental
           python -m pip install --upgrade pip
           pip install poetry
           make install
 
       - name: Run incremental sync
-        run: make run
+        run: |
+          cd integrations/azure_incremental
+          make run
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}

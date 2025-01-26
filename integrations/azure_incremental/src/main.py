@@ -2,12 +2,14 @@ import asyncio
 from typing import Any, Coroutine, Generator
 
 import httpx
-import utils
-from clients.azure_client import AzureClient
-from clients.port import PortClient
-from queries import RESOURCE_CHANGES_QUERY
+from src.utils import turn_sequence_to_chunks
+from src.clients.azure_client import AzureClient
+from src.clients.port import PortClient
+from src.services.resources import sync_resources
+from src.services.resource_containers import sync_resource_containers
+from src.queries import RESOURCE_CHANGES_QUERY
 from loguru import logger
-from settings import app_settings
+from src.settings import app_settings
 
 from azure.mgmt.subscription.models._models_py3 import Subscription
 
@@ -70,42 +72,6 @@ async def process_change_items(
     return delete_tasks, upsert_tasks
 
 
-async def process_subscriptions_into_change_tasks(
-    subscriptions: list[str],
-    query: str,
-    azure_client: AzureClient,
-    port_client: PortClient,
-) -> None:
-    """
-    Processes the subscriptions in batches and runs the query
-    to retrieve the changes.
-    The changes are then processed into upsert and delete tasks.
-    """
-    logger.info(
-        "Running query for subscription batch with "
-        f"{len(subscriptions)} subscriptions"
-    )
-
-    async for items in azure_client.run_query(
-        query,
-        subscriptions,
-    ):
-        logger.info(f"Received batch of {len(items)} resource operations")
-        if not items:
-            logger.info("No changes found in this batch")
-            continue
-        delete_tasks, upsert_tasks = await process_change_items(
-            items, port_client
-        )
-
-        logger.info(
-            f"Running {len(delete_tasks)} delete tasks "
-            f"and {len(upsert_tasks)} upsert tasks"
-        )
-        await asyncio.gather(*upsert_tasks)
-        await asyncio.gather(*delete_tasks)
-
-
 async def main() -> None:
     logger.info("Starting Azure to Port sync")
     async with (
@@ -122,19 +88,21 @@ async def main() -> None:
             return
 
         subscriptions_batches: Generator[list[Subscription], None, None] = (
-            utils.turn_sequence_to_chunks(
+            turn_sequence_to_chunks(
                 all_subscriptions,
                 app_settings.SUBSCRIPTION_BATCH_SIZE,
             )
         )
 
-        query = RESOURCE_CHANGES_QUERY
-
         for subscriptions in subscriptions_batches:
-            await upsert_subscriptions(subscriptions, port_client)
-            await process_subscriptions_into_change_tasks(
+            await sync_resources(
                 [s.subscription_id for s in subscriptions],
-                query,
+                azure_client,
+                port_client,
+            )
+
+            await sync_resource_containers(
+                [s.subscription_id for s in subscriptions],
                 azure_client,
                 port_client,
             )

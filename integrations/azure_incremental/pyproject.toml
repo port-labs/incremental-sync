@@ -1,15 +1,13 @@
 [tool.poetry]
-name = "azure-ingestion"
+name = "azure-incremental"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
-authors = ["lordsarcastic <adeoti.15.jude@gmail.com>"]
-package-mode = false
+authors = [""]
 
 [tool.poetry.dependencies]
+python = "^3.12"
 azure-identity = ">=1.19.0"
 azure-mgmt-subscription = ">=3.1.1"
-python = "^3.12"
 httpx = "^0.28.1"
 loguru = "^0.7.3"
 pydantic-settings = "^2.7.1"

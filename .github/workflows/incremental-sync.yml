@@ -12,7 +12,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      
+
       - name: Checkout To Repository
         uses: actions/checkout@v2
         with:
@@ -21,12 +21,15 @@ jobs:
 
       - name: Install dependencies with Poetry
         run: |
+          cd integrations/azure_incremental
           python -m pip install --upgrade pip
           pip install poetry
           make install
 
       - name: Run incremental sync
-        run: make run
+        run: |
+          cd integrations/azure_incremental
+          make run
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
