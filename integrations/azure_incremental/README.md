@@ -140,7 +140,17 @@ Webhooks on Port are used in this application to allow for flexible schema when 
 
 You can use the webhook mapping below to map the Azure resources to the blueprints in the `"Map the data from the external system into Port"` field. The mapping contains relevant configuration for both upsert and delete operations. The mapping is for illustrative purposes only. You can create your own mapping based on your requirements:
 
-**Note:** The payload from the application contains a `__typename` field which is used to determine the blueprint to ingest the data into with possible values: `Subscription`, `Resource` and `ResourceGroup`, and a `__operation` field depicting what type of operation is to be performed, whether `upsert` or `delete`. The `__typename` field is not part of the Azure resource payload and is only present as a discriminator for the webhook.
+**Note:** 
+- The `body.operation` field is not part of the Azure resource payload and is only present as a discriminator for the webhook.
+- The `body.type` field contains the type of the Azure resource
+  - `resource` for Azure resources
+  - `resourceContainer` for Azure resource containers (e.g. resource groups, subscriptions)
+- The `body.data` field contains the Azure resource payload.
+- The `body.data.type` field contains the type of the Azure resource
+  - `microsoft.resources/subscriptions/resourcegroups` for resource groups
+  - `microsoft.resources/subscriptions` for subscriptions
+  - `microsoft.network/networksecuritygroups` for network security groups
+
 
 ```json
 [
@@ -154,7 +164,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
       "properties": {
         "tags": ".body.data.tags",
         "type": ".body.data.type",
-        "location": ".body.data.location",
+        "location": ".body.data.location"
       },
       "relations": {
         "resourceGroup": ".body.data.resourceGroup"
@@ -202,7 +212,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
       "title": ".body.data.name",
       "properties": {
         "subscriptionId": ".body.data.subscriptionId",
-        "tags": ".body.data.tags",
+        "tags": ".body.data.tags"
       }
     }
   },
