@@ -2,7 +2,7 @@
 name = "azure-incremental"
 version = "0.1.0"
 description = "Add your description here"
-authors = ["tom@getport.io"]
+authors = ["Tom Tankilevitch tom@getport.io"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
