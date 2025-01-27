@@ -122,7 +122,7 @@ Below are the blueprint examples that should be created in Port:
     "resourceGroup": {
       "title": "Resource Group",
       "target": "azureResourceGroup",
-      "required": true,
+      "required": false,
       "many": false
     }
   }
