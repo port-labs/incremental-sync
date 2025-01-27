@@ -7,70 +7,10 @@ from src.clients.azure_client import AzureClient
 from src.clients.port import PortClient
 from src.services.resources import sync_resources
 from src.services.resource_containers import sync_resource_containers
-from src.queries import RESOURCE_CHANGES_QUERY
 from loguru import logger
 from src.settings import app_settings
 
 from azure.mgmt.subscription.models._models_py3 import Subscription
-
-
-async def upsert_subscriptions(
-    subscriptions: list[Subscription], port_client: PortClient
-) -> None:
-    """
-    Constructs the subscription entities and upserts them in Port
-    """
-    logger.info(f"Upserting {len(subscriptions)} subscriptions")
-    tasks: list[Coroutine[Any, Any, None]] = []
-    tasks.extend(
-        port_client.send_webhook_data(
-            subscription.as_dict(),
-            id=subscription.id,
-            operation="upsert",
-            type="subscription",
-        )
-        for subscription in subscriptions
-    )
-
-    await asyncio.gather(*tasks)
-
-
-async def process_change_items(
-    items: list[dict[str, Any]], port_client: PortClient
-) -> tuple[
-    list[Coroutine[Any, Any, None]],
-    list[Coroutine[Any, Any, None]],
-]:
-    """
-    Processes the changes retrieved from Azure and decides
-    whether to upsert or delete them.
-    The upserts and deletions are returned as tasks to be run concurrently.
-    """
-    delete_tasks = []
-    upsert_tasks = []
-
-    for item in items:
-        if item["changeType"] == "Delete":
-            delete_tasks.append(
-                port_client.send_webhook_data(
-                    data=item,
-                    id=item["resourceId"],
-                    operation="delete",
-                    type="resource",
-                )
-            )
-        else:
-            upsert_tasks.append(
-                port_client.send_webhook_data(
-                    data=item,
-                    id=item["resourceId"],
-                    operation="upsert",
-                    type="resource",
-                )
-            )
-
-    return delete_tasks, upsert_tasks
-
 
 async def main() -> None:
     logger.info("Starting Azure to Port sync")
@@ -95,17 +35,17 @@ async def main() -> None:
         )
 
         for subscriptions in subscriptions_batches:
+            await sync_resource_containers(
+                [s.subscription_id for s in subscriptions],
+                azure_client,
+                port_client,
+            )
             await sync_resources(
                 [s.subscription_id for s in subscriptions],
                 azure_client,
                 port_client,
             )
 
-            await sync_resource_containers(
-                [s.subscription_id for s in subscriptions],
-                azure_client,
-                port_client,
-            )
 
     logger.success("Azure to Port sync completed")
 

@@ -21,9 +21,10 @@ resourcechanges
     resources 
     | extend sourceResourceId=tolower(id) 
     | project sourceResourceId, name, location, tags, subscriptionId, resourceGroup 
+    | extend resourceGroup=tolower(resourceGroup)
 ) on $left.resourceId == $right.sourceResourceId 
 | project  subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties
-| order by changeTime desc
+| order by changeTime asc
 """
 async def sync_resources(
     subscriptions: list[str],
