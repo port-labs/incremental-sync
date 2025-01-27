@@ -24,7 +24,7 @@ resourcecontainerchanges
     | project sourceResourceId, type, name, location, tags, subscriptionId, resourceGroup 
 ) on $left.resourceId == $right.sourceResourceId 
 | project  subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime
-| order by changeTime desc
+| order by changeTime asc
 """
 async def sync_resource_containers(
     subscriptions: list[str],
