@@ -159,7 +159,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "create",
     "filter": ".body.type == 'resource' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.resourceId",
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")",
       "title": ".body.data.name",
       "properties": {
         "tags": ".body.data.tags",
@@ -167,7 +167,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
         "location": ".body.data.location"
       },
       "relations": {
-        "resourceGroup": "'/subscriptions/' + .body.data.subscriptionId + '/resourcegroups/' + .body.data.resourceGroup"
+        "resourceGroup": "'/subscriptions/' + .body.data.subscriptionId + '/resourcegroups/' + .body.data.resourceGroup | gsub(\" \";\"_\")"
       }
     }
   },
@@ -176,7 +176,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "delete",
     "filter": ".body.type == 'resource' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.resourceId"
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")"
     }
   },
   {
@@ -184,14 +184,14 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "create",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions/resourcegroups' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.resourceId",
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")",
       "title": ".body.data.name",
       "properties": {
         "tags": ".body.data.tags",
         "location": ".body.data.location"
       },
       "relations": {
-        "subscription": "'/subscriptions/' + .body.data.subscriptionId"
+        "subscription": "'/subscriptions/' + .body.data.subscriptionId | gsub(\" \";\"_\")"
       }
     }
   },
@@ -200,7 +200,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "delete",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions/resourcegroups' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.resourceId"
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")"
     }
   },
   {
@@ -208,7 +208,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "create",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.resourceId",
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")",
       "title": ".body.data.name",
       "properties": {
         "subscriptionId": ".body.data.subscriptionId",
@@ -221,7 +221,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "delete",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.resourceId"
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")"
     }
   }
 ]
@@ -290,6 +290,47 @@ jobs:
           PORT_WEBHOOK_INGEST_URL: ${{ secrets.PORT_WEBHOOK_INGEST_URL }}
           CHANGE_WINDOW_MINUTES: 15
 ```
+
+An example of a GitHub workflow which runs full sync manually is shown below:
+
+:warning: It is recommended to run the full sync manually as it may take a long time to complete, depending on the number of Azure resources, subscriptions, and resource groups.
+
+```yml
+
+name: "Full sync of Azure resources to Port"
+
+on:
+  - workflow_dispatch
+
+jobs:
+  - name: Full sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout To Repository
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          repository: port-labs/incremental-sync
+
+      - name: Install dependencies with Poetry
+        run: |
+          cd integrations/azure_incremental
+          python -m pip install --upgrade pip
+          pip install poetry
+          make install
+
+      - name: Run full sync
+        run: |
+          cd integrations/azure_incremental
+          make run
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          PORT_WEBHOOK_INGEST_URL: ${{ secrets.PORT_WEBHOOK_INGEST_URL }}
+          SYNC_MODE: full
+```
+
 
 ### Local
 

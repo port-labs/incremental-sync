@@ -1,16 +1,19 @@
 import asyncio
-from typing import Any, Coroutine, Generator
+from typing import Generator
 
 import httpx
 from src.utils import turn_sequence_to_chunks
 from src.clients.azure_client import AzureClient
 from src.clients.port import PortClient
-from src.services.resources import sync_resources
-from src.services.resource_containers import sync_resource_containers
+
 from loguru import logger
-from src.settings import app_settings
+from src.settings import app_settings, SyncMode
 
 from azure.mgmt.subscription.models._models_py3 import Subscription
+
+from src.services.resource_containers import ResourceContainers
+from src.services.resources import Resources
+
 
 async def main() -> None:
     logger.info("Starting Azure to Port sync")
@@ -34,18 +37,24 @@ async def main() -> None:
             )
         )
 
-        for subscriptions in subscriptions_batches:
-            await sync_resource_containers(
-                [s.subscription_id for s in subscriptions],
-                azure_client,
-                port_client,
-            )
-            await sync_resources(
-                [s.subscription_id for s in subscriptions],
-                azure_client,
-                port_client,
-            )
+        resource_containers = ResourceContainers(azure_client, port_client)
+        resources = Resources(azure_client, port_client)
 
+        for subscriptions in subscriptions_batches:
+            if app_settings.SYNC_MODE == SyncMode.incremental:
+                await resource_containers.sync_incremental(
+                    [s.subscription_id for s in subscriptions],
+                )
+                await resources.sync_incremental(
+                    [s.subscription_id for s in subscriptions],
+                )
+            else:
+                await resource_containers.sync_full(
+                    [s.subscription_id for s in subscriptions],
+                )
+                await resources.sync_full(
+                    [s.subscription_id for s in subscriptions],
+                )
 
     logger.success("Azure to Port sync completed")
 

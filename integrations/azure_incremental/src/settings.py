@@ -1,5 +1,10 @@
 from pydantic_settings import BaseSettings
+from enum import StrEnum
 
+
+class SyncMode(StrEnum):
+    incremental = "incremental"
+    full = "full"
 
 class _AppSettings(BaseSettings):
     AZURE_CLIENT_ID: str
@@ -8,6 +13,7 @@ class _AppSettings(BaseSettings):
     PORT_WEBHOOK_SECRET: str = "azure-incremental"
     SUBSCRIPTION_BATCH_SIZE: int = 1000
     CHANGE_WINDOW_MINUTES: int = 15
+    SYNC_MODE: SyncMode = SyncMode.incremental
 
 
 app_settings = _AppSettings()
