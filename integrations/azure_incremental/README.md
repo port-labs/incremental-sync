@@ -159,7 +159,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "create",
     "filter": ".body.type == 'resource' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.resourceId",
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")",
       "title": ".body.data.name",
       "properties": {
         "tags": ".body.data.tags",
@@ -167,7 +167,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
         "location": ".body.data.location"
       },
       "relations": {
-        "resourceGroup": "'/subscriptions/' + .body.data.subscriptionId + '/resourcegroups/' + .body.data.resourceGroup"
+        "resourceGroup": "'/subscriptions/' + .body.data.subscriptionId + '/resourcegroups/' + .body.data.resourceGroup | gsub(\" \";\"_\")"
       }
     }
   },
@@ -176,7 +176,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "delete",
     "filter": ".body.type == 'resource' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.resourceId"
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")"
     }
   },
   {
@@ -184,14 +184,14 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "create",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions/resourcegroups' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.resourceId",
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")",
       "title": ".body.data.name",
       "properties": {
         "tags": ".body.data.tags",
         "location": ".body.data.location"
       },
       "relations": {
-        "subscription": "'/subscriptions/' + .body.data.subscriptionId"
+        "subscription": "'/subscriptions/' + .body.data.subscriptionId | gsub(\" \";\"_\")"
       }
     }
   },
@@ -200,7 +200,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "delete",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions/resourcegroups' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.resourceId"
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")"
     }
   },
   {
@@ -208,7 +208,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "create",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions' and .body.operation == 'upsert'",
     "entity": {
-      "identifier": ".body.data.resourceId",
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")",
       "title": ".body.data.name",
       "properties": {
         "subscriptionId": ".body.data.subscriptionId",
@@ -221,7 +221,7 @@ You can use the webhook mapping below to map the Azure resources to the blueprin
     "operation": "delete",
     "filter": ".body.data.type == 'microsoft.resources/subscriptions' and .body.operation == 'delete'",
     "entity": {
-      "identifier": ".body.data.resourceId"
+      "identifier": ".body.data.resourceId | gsub(\" \";\"_\")"
     }
   }
 ]
