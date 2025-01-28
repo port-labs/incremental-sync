@@ -24,13 +24,18 @@ class PortClient:
             }
 
             logger.info(f"Sending {operation} request to webhook for type: {type}, id: {id}")
-            response = await self.http_client.post(
-                self.webhook_ingest_url,
-                json=body_json,
-            )
-            try:
-                response.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Failed to send data to webhook: {e}")
-                logger.error(f"Response: {response.json()}")
-            logger.info(f"Sent {operation} request to webhook for type: {type}, id: {id}")
+            retries = 3
+            while retries > 0:
+                try:
+                    response = await self.http_client.post(
+                        self.webhook_ingest_url,
+                        json=body_json,
+                    )
+                    response.raise_for_status()
+                    break
+                except Exception as e:
+                    logger.error(f"Failed to send data to webhook: {e}")
+                    logger.error(f"Response: {response.json()}")
+                    logger.info("Retrying to send data to webhook")
+                    await asyncio.sleep(1)
+                    retries -= 1
