@@ -47,6 +47,7 @@ async def main() -> None:
                 )
                 await resources.sync_incremental(
                     [s.subscription_id for s in subscriptions],
+                    app_settings.RESOURCE_TYPES
                 )
             else:
                 await resource_containers.sync_full(
@@ -54,6 +55,7 @@ async def main() -> None:
                 )
                 await resources.sync_full(
                     [s.subscription_id for s in subscriptions],
+                    app_settings.RESOURCE_TYPES
                 )
 
     logger.success("Azure to Port sync completed")

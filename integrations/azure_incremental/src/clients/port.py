@@ -35,7 +35,6 @@ class PortClient:
                     break
                 except Exception as e:
                     logger.error(f"Failed to send data to webhook: {e}")
-                    logger.error(f"Response: {response.json()}")
                     logger.info("Retrying to send data to webhook")
                     await asyncio.sleep(1)
                     retries -= 1

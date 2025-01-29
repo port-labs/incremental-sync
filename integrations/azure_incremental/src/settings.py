@@ -14,6 +14,7 @@ class _AppSettings(BaseSettings):
     SUBSCRIPTION_BATCH_SIZE: int = 1000
     CHANGE_WINDOW_MINUTES: int = 15
     SYNC_MODE: SyncMode = SyncMode.incremental
+    RESOURCE_TYPES: list[str] | None = None
 
 
 app_settings = _AppSettings()

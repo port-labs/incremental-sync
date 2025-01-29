@@ -20,6 +20,7 @@ class AzureClient:
         self._credentials: DefaultAzureCredential | None = None
         self.subs_client: SubscriptionClient | None = None
         self.resource_g_client: ResourceGraphClient | None = None
+        # https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/request-limits-and-throttling#migrating-to-regional-throttling-and-token-bucket-algorithm
         self._rate_limiter = TokenBucketRateLimiter(
             capacity=250,
             refill_rate=25,
