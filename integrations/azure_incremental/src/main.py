@@ -42,18 +42,22 @@ async def main() -> None:
 
         for subscriptions in subscriptions_batches:
             if app_settings.SYNC_MODE == SyncMode.incremental:
+                logger.info("Running incremental sync")
                 await resource_containers.sync_incremental(
                     [s.subscription_id for s in subscriptions],
                 )
                 await resources.sync_incremental(
                     [s.subscription_id for s in subscriptions],
+                    app_settings.RESOURCE_TYPES
                 )
             else:
+                logger.info("Running full sync")
                 await resource_containers.sync_full(
                     [s.subscription_id for s in subscriptions],
                 )
                 await resources.sync_full(
                     [s.subscription_id for s in subscriptions],
+                    app_settings.RESOURCE_TYPES
                 )
 
     logger.success("Azure to Port sync completed")

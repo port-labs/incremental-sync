@@ -29,8 +29,10 @@ resourcecontainerchanges
 
 FULL_SYNC_QUERY: str = f"""
 resourcecontainers 
-   | extend resourceId=tolower(id) 
-   | project resourceId, type, name, location, tags, subscriptionId, resourceGroup
+| extend resourceId=tolower(id) 
+| project resourceId, type, name, location, tags, subscriptionId, resourceGroup
+| extend resourceGroup=tolower(resourceGroup)
+| extend type=tolower(type)
 """
 
 class ResourceContainers:

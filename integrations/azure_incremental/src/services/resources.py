@@ -5,33 +5,53 @@ from src.clients.azure_client import AzureClient
 from src.clients.port import PortClient
 from src.settings import app_settings
 
-INCREMENTAL_QUERY: str = f"""
-resourcechanges 
-| extend changeTime=todatetime(properties.changeAttributes.timestamp)
-| extend targetResourceId=tostring(properties.targetResourceId)
-| extend changeType=tostring(properties.changeType)
-| extend changedProperties=properties.changes
-| project-away tags, name, type
-| extend type=tostring(properties.targetResourceType)
-| extend changeCount=properties.changeAttributes.changesCount 
-| extend resourceId=tolower(targetResourceId) 
-| where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
-| summarize arg_max(changeTime, *) by resourceId
-| join kind=leftouter ( 
-    resources 
-    | extend sourceResourceId=tolower(id) 
-    | project sourceResourceId, name, location, tags, subscriptionId, resourceGroup 
-    | extend resourceGroup=tolower(resourceGroup)
-) on $left.resourceId == $right.sourceResourceId 
-| project  subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties
-| order by changeTime asc
-"""
+def build_incremental_query(resource_types: list[str] | None = None) -> str:
+    filter_clause = ""
+    if resource_types:
+        resource_types_filter = " or ".join([f"type == '{rt.lower()}'" for rt in resource_types])
+        filter_clause = f"| where {resource_types_filter}"
 
-FULL_SYNC_QUERY: str = f"""
-resources
-| extend resourceId=tolower(id)
-| project resourceId, type, name, location, tags, subscriptionId, resourceGroup
-"""
+    query = f"""
+    resourcechanges 
+    | extend changeTime=todatetime(properties.changeAttributes.timestamp)
+    | extend targetResourceId=tostring(properties.targetResourceId)
+    | extend changeType=tostring(properties.changeType)
+    | extend changedProperties=properties.changes
+    | project-away tags, name, type
+    | extend type=tostring(properties.targetResourceType)
+    | extend changeCount=properties.changeAttributes.changesCount 
+    | extend resourceId=tolower(targetResourceId) 
+    | where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
+    {filter_clause}
+    | summarize arg_max(changeTime, *) by resourceId
+    | join kind=leftouter ( 
+        resources 
+        | extend sourceResourceId=tolower(id) 
+        | project sourceResourceId, name, location, tags, subscriptionId, resourceGroup 
+        | extend resourceGroup=tolower(resourceGroup)
+    ) on $left.resourceId == $right.sourceResourceId 
+    | project subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties
+    | order by changeTime asc
+    """
+
+    return query
+
+def build_full_sync_query(resource_types: list[str] | None = None) -> str:
+    filter_clause = ""
+    if resource_types:
+        resource_types_filter = " or ".join([f"type == '{rt}'" for rt in resource_types])
+        filter_clause = f"| where {resource_types_filter}"
+
+    query = f"""
+    resources
+    | extend resourceId=tolower(id)
+    | project resourceId, type, name, location, tags, subscriptionId, resourceGroup
+    | extend resourceGroup=tolower(resourceGroup)
+    | extend type=tolower(type)
+    {filter_clause}
+    """
+
+    return query
 
 class Resources:
     def __init__(self, azure_client: AzureClient, port_client: PortClient):
@@ -41,6 +61,7 @@ class Resources:
     async def sync_full(
         self,
         subscriptions: list[str],
+        resource_types: list[str] | None = None,
     ) -> None:
         logger.info(
             "Running query for subscription batch with "
@@ -48,7 +69,7 @@ class Resources:
         )
 
         async for items in self.azure_client.run_query(
-            FULL_SYNC_QUERY,
+            build_full_sync_query(resource_types),
             subscriptions,
         ):
             logger.info(f"Received batch of {len(items)} resources")
@@ -71,6 +92,7 @@ class Resources:
     async def sync_incremental(
         self,
         subscriptions: list[str],
+        resource_types: list[str] | None = None,
     ) -> None:
         """
         Processes the subscriptions in batches and runs the query
@@ -83,7 +105,7 @@ class Resources:
         )
 
         async for items in self.azure_client.run_query(
-            INCREMENTAL_QUERY,
+            build_incremental_query(resource_types),
             subscriptions,
         ):
             logger.info(f"Received batch of {len(items)} resource operations")

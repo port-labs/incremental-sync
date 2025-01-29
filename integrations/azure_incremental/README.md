@@ -241,6 +241,7 @@ To run the application in a GitHub workflow, ensure you do the following in the 
 Additional environment variables:
   - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is `1000` which is also the maximum size.
   - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is `15` minutes.
+  - `RESOURCE_TYPES` (type str): The Azure resource types to sync. Default is All, which means all resource types will be synced. You can specify a comma-separated list of resource types to sync. For example, `export RESOURCE_TYPES='["microsoft.keyvault/vaults","Microsoft.Network/virtualNetworks", "Microsoft.network/networksecuritygroups"]'`
 
 - The GitHub workflow steps should checkout into the repository, install the required packages using Poetry, and run the script to sync the Azure resources into Port with the following command:
 
