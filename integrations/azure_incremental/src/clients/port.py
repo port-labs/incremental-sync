@@ -13,7 +13,7 @@ class PortClient:
         self.http_client = http_client
         self.webhook_ingest_url = app_settings.PORT_WEBHOOK_INGEST_URL
         self.webhook_secret = app_settings.PORT_WEBHOOK_SECRET
-        self.semaphore = asyncio.Semaphore(50)
+        self.semaphore = asyncio.Semaphore(25)
 
     async def send_webhook_data(self, data: dict[str, Any], id: str, operation: str, type: str) -> None:
         async with self.semaphore:
@@ -32,9 +32,10 @@ class PortClient:
                         json=body_json,
                     )
                     response.raise_for_status()
+                    logger.info(f"Successfully sent {operation} request to webhook for type: {type}, id: {id}")
                     break
                 except Exception as e:
-                    logger.error(f"Failed to send data to webhook: {e}")
+                    logger.error(f"Failed to send data to webhook: {e}, operation: {operation}, type: {type}, id: {id}")
                     logger.info("Retrying to send data to webhook")
                     await asyncio.sleep(1)
                     retries -= 1
