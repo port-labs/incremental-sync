@@ -16,6 +16,46 @@ Keep the following values handy:
 - `AZURE_CLIENT_SECRET`: The client secret of the Azure service principal.
 - `AZURE_TENANT_ID`: The tenant ID of the Azure service principal.
 
+### Required Azure Permissions Setup
+
+After creating your Azure App Registration, you need to configure the following permissions and roles:
+
+#### 1. API Permissions
+1. Go to Azure Portal → Azure Active Directory → App registrations
+2. Find your app registration
+3. Click on "API permissions" in the left menu
+4. Click "Add a permission"
+5. Add the following permissions:
+   - **Azure Service Management**
+     - Select "user_impersonation"
+     - Click "Add permissions"
+   - **Azure Resource Graph**
+     - Click on "APIs my organization uses" tab
+     - Search for "Azure Resource Graph"
+     - Select "Read" permission
+     - Click "Add permissions"
+6. Click "Grant admin consent" for your organization for both permissions
+
+#### 2. Role Assignments
+1. Go to your Azure subscription
+2. Click on "Access control (IAM)"
+3. Click "Add" → "Add role assignment"
+4. Assign the following role:
+   - Select "Reader" role
+   - In the Members tab, search for your app registration
+   - Select it and click "Select"
+   - Click "Review + assign"
+
+#### 3. Verification
+You can verify your setup is working by:
+1. Running the integration
+2. Checking if it can successfully:
+   - List your subscriptions
+   - Query Azure Resource Graph
+   - Read resource information
+
+If you encounter "Access Denied" errors, double-check that both the API permissions and role assignments are properly configured.
+
 ### Port Setup
 
 #### Port Credentials
