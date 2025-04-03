@@ -2,17 +2,15 @@ import asyncio
 from typing import Generator
 
 import httpx
-from src.utils import turn_sequence_to_chunks
+from azure.mgmt.subscription.models._models_py3 import Subscription
+from loguru import logger
+
 from src.clients.azure_client import AzureClient
 from src.clients.port import PortClient
-
-from loguru import logger
-from src.settings import app_settings, SyncMode
-
-from azure.mgmt.subscription.models._models_py3 import Subscription
-
 from src.services.resource_containers import ResourceContainers
 from src.services.resources import Resources
+from src.settings import SyncMode, app_settings
+from src.utils import turn_sequence_to_chunks
 
 
 async def main() -> None:

@@ -26,7 +26,7 @@ endef
 install:
 	$(call deactivate_virtualenv) && \
 	$(call install_poetry) && \
-	poetry install --with dev
+	poetry install --with dev --no-root
 
 format:
 	@poetry run ruff format .

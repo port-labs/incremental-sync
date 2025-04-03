@@ -3,7 +3,9 @@ from typing import Any
 
 import httpx
 from loguru import logger
+
 from src.settings import app_settings
+
 
 class PortClient:
     def __init__(
