@@ -282,8 +282,7 @@ Additional environment variables:
   - `SUBSCRIPTION_BATCH_SIZE` (type: int): The number of subscriptions to sync in each batch. Default is `1000` which is also the maximum size.
   - `CHANGE_WINDOW_MINUTES` (type: int): The number of minutes to consider for changes in Azure resources. Default is `15` minutes.
   - `RESOURCE_TYPES` (type str): The Azure resource types to sync. Default is All, which means all resource types will be synced. You can specify a comma-separated list of resource types to sync. For example, `export RESOURCE_TYPES='["microsoft.keyvault/vaults","Microsoft.Network/virtualNetworks", "Microsoft.network/networksecuritygroups"]'`
-  - `RESOURCE_GROUP_TAG_FILTERS` (type: str): JSON string of key-value pairs for filtering resources based on their resource group tags. For example, `'{"Environment": "Production", "Team": "Platform"}'`
-  - `EXCLUDE_RESOURCES_BY_RG_TAGS` (type: bool): Whether to exclude resources that match the resource group tag filters (true) or include only resources that match (false). Default is `false`.
+  - `RESOURCE_GROUP_TAG_FILTERS` (type: str): JSON string for filtering resources based on their resource group tags.For example: `'{"include": {"Environment": "Production"}, "exclude": {"Temporary": "true"}}'`
 
 - The GitHub workflow steps should checkout into the repository, install the required packages using Poetry, and run the script to sync the Azure resources into Port with the following command:
 
@@ -332,9 +331,8 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           PORT_WEBHOOK_INGEST_URL: ${{ secrets.PORT_WEBHOOK_INGEST_URL }}
           CHANGE_WINDOW_MINUTES: 15
-          # Optional: Filter resources by resource group tags
-          # RESOURCE_GROUP_TAG_FILTERS: '{"Environment": "Production"}'
-          # EXCLUDE_RESOURCES_BY_RG_TAGS: false
+          # Optional: Enhanced resource group tag filtering
+          # RESOURCE_GROUP_TAG_FILTERS: '{"include": {"Environment": "Production"}, "exclude": {"Temporary": "true"}}'
 ```
 
 An example of a GitHub workflow which runs full sync manually is shown below:
@@ -401,49 +399,96 @@ Additional environment variables:
 
 - Run the script to sync the Azure resources into Port using `make run`.
 
-## Resource Group Tag Filtering
+## Resource Group Tag Filtering (Enhanced)
 
-The integration supports filtering Azure resources based on tags applied to their parent resource groups. This is particularly useful when:
+The integration supports powerful filtering of Azure resources based on tags applied to their parent resource groups. The enhanced format allows you to specify both include and exclude conditions in a single configuration.
 
-- Individual resources lack the relevant tags
-- The resource group has the necessary tags for classification
-- You want to avoid tagging every individual resource
-- You need a consistent filtering mechanism across all resources in a resource group
+### Why Use Resource Group Tag Filtering?
+
+- Individual resources often lack the relevant tags
+- Resource groups typically have consistent tagging for classification
+- Avoids the need to tag every individual resource
+- Provides a consistent filtering mechanism across all resources in a resource group
+- Reduces sync time and data volume by filtering at the query level
+
+### Enhanced Configuration Format
+
+The new enhanced format supports both include and exclude filters in a single configuration:
+
+```json
+{
+  "include": {"Environment": "Production", "Team": "Platform"},
+  "exclude": {"Temporary": "true", "Stage": "deprecated"}
+}
+```
 
 ### Configuration Examples
 
-**Include only resources from resource groups with specific tags:**
+**Include only Production resources:**
 ```bash
-export RESOURCE_GROUP_TAG_FILTERS='{"Environment": "Production", "Team": "Platform"}'
-export EXCLUDE_RESOURCES_BY_RG_TAGS=false
+export RESOURCE_GROUP_TAG_FILTERS='{"include": {"Environment": "Production"}}'
 ```
 
-**Exclude resources from resource groups with specific tags:**
+**Include Production resources, but exclude temporary ones:**
 ```bash
-export RESOURCE_GROUP_TAG_FILTERS='{"Temporary": "true", "Stage": "development"}'
-export EXCLUDE_RESOURCES_BY_RG_TAGS=true
+export RESOURCE_GROUP_TAG_FILTERS='{"include": {"Environment": "Production"}, "exclude": {"Temporary": "true"}}'
 ```
 
-**Filter by single tag:**
+**Include Platform team resources, exclude Development environment:**
 ```bash
-export RESOURCE_GROUP_TAG_FILTERS='{"Environment": "Production"}'
-export EXCLUDE_RESOURCES_BY_RG_TAGS=false
+export RESOURCE_GROUP_TAG_FILTERS='{"include": {"Team": "Platform"}, "exclude": {"Environment": "Development"}}'
 ```
+
+**Exclude only (no include filters) - exclude Development and Staging:**
+```bash
+export RESOURCE_GROUP_TAG_FILTERS='{"exclude": {"Environment": "Development", "Stage": "staging"}}'
+```
+
+**Complex multi-condition filtering:**
+```bash
+export RESOURCE_GROUP_TAG_FILTERS='{"include": {"Environment": "Production", "Team": "Platform"}, "exclude": {"Temporary": "true", "Purpose": "testing"}}'
+```
+
+### Filter Logic
+
+**Include Filters (AND logic):**
+- ALL include conditions must match
+- Resource groups must have ALL specified tags with matching values
+- Example: `{"Environment": "Production", "Team": "Platform"}` requires BOTH tags
+
+**Exclude Filters (OR logic):**
+- ANY exclude condition will exclude the resource group
+- Resource groups with ANY of the specified tags will be filtered out
+- Example: `{"Temporary": "true", "Stage": "deprecated"}` excludes if EITHER tag matches
+
+**Combined Logic:**
+- Resources must match include criteria AND NOT match exclude criteria
+- Include filters are evaluated first, then exclude filters are applied
+- Empty include means "include all" (unless excluded)
+- Empty exclude means "exclude none"
 
 ### How it works
 
-1. The integration queries both resources and their parent resource groups
-2. It joins the resource data with resource group tag information
-3. Filtering is applied at the Azure Resource Graph query level for optimal performance
-4. Both resource and resource group tag information is included in the synced data
-5. The filtering applies to both incremental and full sync modes
+1. **Query-Level Filtering**: Filtering happens at the Azure Resource Graph query level for optimal performance
+2. **Resource Group Join**: Resources are joined with their parent resource groups to access RG tags
+3. **Tag Inheritance**: Resource data includes both resource tags and resource group tags (`rgTags` field)
+4. **Dual Application**: Filtering applies to both individual resources and resource containers
+5. **Mode Support**: Works with both incremental and full sync modes
 
-### Tag Matching
+### Tag Matching Rules
 
-- Tag matching is case-insensitive
-- All specified tag conditions must match (AND logic)
-- If a resource group doesn't have the specified tags, it will be filtered out (when including) or included (when excluding)
-- Empty or null tag values are treated as non-matches
+- **Case-Insensitive**: Tag matching is case-insensitive (`Production` matches `production`)
+- **Exact Value Match**: Tag values must match exactly (after case normalization)
+- **Missing Tags**: Resource groups without required include tags are filtered out
+- **Null/Empty Values**: Empty or null tag values are treated as non-matches
+- **Quote Handling**: Special characters in tag values are properly escaped
+
+### Performance Benefits
+
+- **Azure-Side Filtering**: Filtering occurs in Azure Resource Graph, reducing data transfer
+- **Reduced API Calls**: Only relevant resources are retrieved from Azure
+- **Faster Sync**: Less data to process and send to Port
+- **Optimized Queries**: KQL queries are optimized for tag-based filtering
 
 ## How it works
 

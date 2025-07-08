@@ -1,36 +1,53 @@
 import asyncio
-from typing import Dict
 
 from loguru import logger
 
 from src.clients.azure_client import AzureClient
 from src.clients.port import PortClient
-from src.settings import app_settings
+from src.settings import ResourceGroupTagFilters, app_settings
 
 
-def build_rg_tag_filter_clause(
-    tag_filters: Dict[str, str] | None, exclude: bool = False
-) -> str:
-    """Build KQL where clause for resource group tag filtering."""
-    if not tag_filters:
+def build_rg_tag_filter_clause(filters: ResourceGroupTagFilters) -> str:
+    """Build KQL where clause for resource group tag filtering with include/exclude logic."""
+    if not filters.has_filters():
         return ""
 
-    conditions = []
-    for key, value in tag_filters.items():
-        # Escape quotes in tag values and handle case-insensitive comparison
-        escaped_key = key.replace("'", "''")
-        escaped_value = value.replace("'", "''")
-        conditions.append(f"tostring(rgTags['{escaped_key}']) =~ '{escaped_value}'")
+    conditions: list[str] = []
+
+    # Build include conditions (AND logic within include)
+    if filters.include:
+        include_conditions = []
+        for key, value in filters.include.items():
+            escaped_key = key.replace("'", "''")
+            escaped_value = value.replace("'", "''")
+            include_conditions.append(
+                f"tostring(rgTags['{escaped_key}']) =~ '{escaped_value}'"
+            )
+
+        if include_conditions:
+            include_clause = " and ".join(include_conditions)
+            conditions.append(f"({include_clause})")
+
+    # Build exclude conditions (OR logic within exclude, then NOT the whole thing)
+    if filters.exclude:
+        exclude_conditions = []
+        for key, value in filters.exclude.items():
+            escaped_key = key.replace("'", "''")
+            escaped_value = value.replace("'", "''")
+            exclude_conditions.append(
+                f"tostring(rgTags['{escaped_key}']) =~ '{escaped_value}'"
+            )
+
+        if exclude_conditions:
+            exclude_clause = " or ".join(exclude_conditions)
+            conditions.append(f"not ({exclude_clause})")
 
     if not conditions:
         return ""
 
+    # Combine include and exclude with AND logic
     combined_condition = " and ".join(conditions)
-
-    if exclude:
-        return f"| where not ({combined_condition})"
-    else:
-        return f"| where {combined_condition}"
+    return f"| where {combined_condition}"
 
 
 def build_incremental_query(resource_types: list[str] | None = None) -> str:
@@ -43,9 +60,7 @@ def build_incremental_query(resource_types: list[str] | None = None) -> str:
 
     # Get resource group tag filters
     rg_tag_filters = app_settings.get_resource_group_tag_filters()
-    rg_tag_filter_clause = build_rg_tag_filter_clause(
-        rg_tag_filters, app_settings.EXCLUDE_RESOURCES_BY_RG_TAGS
-    )
+    rg_tag_filter_clause = build_rg_tag_filter_clause(rg_tag_filters)
 
     query = f"""
     resourcechanges 
@@ -89,9 +104,7 @@ def build_full_sync_query(resource_types: list[str] | None = None) -> str:
 
     # Get resource group tag filters
     rg_tag_filters = app_settings.get_resource_group_tag_filters()
-    rg_tag_filter_clause = build_rg_tag_filter_clause(
-        rg_tag_filters, app_settings.EXCLUDE_RESOURCES_BY_RG_TAGS
-    )
+    rg_tag_filter_clause = build_rg_tag_filter_clause(rg_tag_filters)
 
     query = f"""
     resources
@@ -119,15 +132,18 @@ class Resources:
 
         # Log resource group tag filtering configuration
         rg_tag_filters = app_settings.get_resource_group_tag_filters()
-        if rg_tag_filters:
-            action = (
-                "excluding"
-                if app_settings.EXCLUDE_RESOURCES_BY_RG_TAGS
-                else "including"
-            )
-            logger.info(
-                f"Resource filtering enabled: {action} resources based on resource group tags: {rg_tag_filters}"
-            )
+        if rg_tag_filters.has_filters():
+            filter_description = []
+            if rg_tag_filters.include:
+                filter_description.append(
+                    f"including resources with RG tags: {rg_tag_filters.include}"
+                )
+            if rg_tag_filters.exclude:
+                filter_description.append(
+                    f"excluding resources with RG tags: {rg_tag_filters.exclude}"
+                )
+
+            logger.info(f"Resource filtering enabled: {', '.join(filter_description)}")
 
     async def sync_full(
         self,
