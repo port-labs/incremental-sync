@@ -39,3 +39,6 @@ lint:
 
 run:
 	@poetry run python -m src.main
+
+test:
+	@poetry run pytest tests/ -v
