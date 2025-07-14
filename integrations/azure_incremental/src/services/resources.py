@@ -1,15 +1,66 @@
 import asyncio
+
 from loguru import logger
 
 from src.clients.azure_client import AzureClient
 from src.clients.port import PortClient
-from src.settings import app_settings
+from src.settings import ResourceGroupTagFilters, app_settings
+
+
+def build_rg_tag_filter_clause(filters: ResourceGroupTagFilters) -> str:
+    """Build KQL where clause for resource group tag filtering with include/exclude logic."""
+    if not filters.has_filters():
+        return ""
+
+    conditions: list[str] = []
+
+    # Build include conditions (AND logic within include)
+    if filters.include:
+        include_conditions = []
+        for key, value in filters.include.items():
+            escaped_key = key.replace("'", "''")
+            escaped_value = value.replace("'", "''")
+            include_conditions.append(
+                f"tostring(rgTags['{escaped_key}']) =~ '{escaped_value}'"
+            )
+
+        if include_conditions:
+            include_clause = " and ".join(include_conditions)
+            conditions.append(f"({include_clause})")
+
+    # Build exclude conditions (OR logic within exclude, then NOT the whole thing)
+    if filters.exclude:
+        exclude_conditions = []
+        for key, value in filters.exclude.items():
+            escaped_key = key.replace("'", "''")
+            escaped_value = value.replace("'", "''")
+            exclude_conditions.append(
+                f"tostring(rgTags['{escaped_key}']) =~ '{escaped_value}'"
+            )
+
+        if exclude_conditions:
+            exclude_clause = " or ".join(exclude_conditions)
+            conditions.append(f"not ({exclude_clause})")
+
+    if not conditions:
+        return ""
+
+    # Combine include and exclude with AND logic
+    combined_condition = " and ".join(conditions)
+    return f"| where {combined_condition}"
+
 
 def build_incremental_query(resource_types: list[str] | None = None) -> str:
-    filter_clause = ""
+    resource_type_filter = ""
     if resource_types:
-        resource_types_filter = " or ".join([f"type == '{rt.lower()}'" for rt in resource_types])
-        filter_clause = f"| where {resource_types_filter}"
+        resource_types_filter = " or ".join(
+            [f"type == '{rt.lower()}'" for rt in resource_types]
+        )
+        resource_type_filter = f"| where {resource_types_filter}"
+
+    # Get resource group tag filters
+    rg_tag_filters = app_settings.get_resource_group_tag_filters()
+    rg_tag_filter_clause = build_rg_tag_filter_clause(rg_tag_filters)
 
     query = f"""
     resourcechanges 
@@ -22,7 +73,7 @@ def build_incremental_query(resource_types: list[str] | None = None) -> str:
     | extend changeCount=properties.changeAttributes.changesCount 
     | extend resourceId=tolower(targetResourceId) 
     | where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
-    {filter_clause}
+    {resource_type_filter}
     | summarize arg_max(changeTime, *) by resourceId
     | join kind=leftouter ( 
         resources 
@@ -30,17 +81,30 @@ def build_incremental_query(resource_types: list[str] | None = None) -> str:
         | project sourceResourceId, name, location, tags, subscriptionId, resourceGroup 
         | extend resourceGroup=tolower(resourceGroup)
     ) on $left.resourceId == $right.sourceResourceId 
-    | project subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties
+    | join kind=leftouter (
+        resourcecontainers
+        | where type =~ 'microsoft.resources/subscriptions/resourcegroups'
+        | project rgName=tolower(name), rgTags=tags, rgSubscriptionId=subscriptionId
+    ) on $left.subscriptionId == $right.rgSubscriptionId and $left.resourceGroup == $right.rgName
+    {rg_tag_filter_clause}
+    | project subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties, rgTags
     | order by changeTime asc
     """
 
     return query
 
+
 def build_full_sync_query(resource_types: list[str] | None = None) -> str:
-    filter_clause = ""
+    resource_type_filter = ""
     if resource_types:
-        resource_types_filter = " or ".join([f"type == '{rt}'" for rt in resource_types])
-        filter_clause = f"| where {resource_types_filter}"
+        resource_types_filter = " or ".join(
+            [f"type == '{rt}'" for rt in resource_types]
+        )
+        resource_type_filter = f"| where {resource_types_filter}"
+
+    # Get resource group tag filters
+    rg_tag_filters = app_settings.get_resource_group_tag_filters()
+    rg_tag_filter_clause = build_rg_tag_filter_clause(rg_tag_filters)
 
     query = f"""
     resources
@@ -48,15 +112,38 @@ def build_full_sync_query(resource_types: list[str] | None = None) -> str:
     | project resourceId, type, name, location, tags, subscriptionId, resourceGroup
     | extend resourceGroup=tolower(resourceGroup)
     | extend type=tolower(type)
-    {filter_clause}
+    {resource_type_filter}
+    | join kind=leftouter (
+        resourcecontainers
+        | where type =~ 'microsoft.resources/subscriptions/resourcegroups'
+        | project rgName=tolower(name), rgTags=tags, rgSubscriptionId=subscriptionId
+    ) on $left.subscriptionId == $right.rgSubscriptionId and $left.resourceGroup == $right.rgName
+    {rg_tag_filter_clause}
+    | project resourceId, type, name, location, tags, subscriptionId, resourceGroup, rgTags
     """
 
     return query
+
 
 class Resources:
     def __init__(self, azure_client: AzureClient, port_client: PortClient):
         self.azure_client = azure_client
         self.port_client = port_client
+
+        # Log resource group tag filtering configuration
+        rg_tag_filters = app_settings.get_resource_group_tag_filters()
+        if rg_tag_filters.has_filters():
+            filter_description = []
+            if rg_tag_filters.include:
+                filter_description.append(
+                    f"including resources with RG tags: {rg_tag_filters.include}"
+                )
+            if rg_tag_filters.exclude:
+                filter_description.append(
+                    f"excluding resources with RG tags: {rg_tag_filters.exclude}"
+                )
+
+            logger.info(f"Resource filtering enabled: {', '.join(filter_description)}")
 
     async def sync_full(
         self,
@@ -78,12 +165,14 @@ class Resources:
                 continue
             tasks = []
             for item in items:
-                tasks.append(self.port_client.send_webhook_data(
-                    data=item,
-                    id=item["resourceId"],
-                    operation="upsert",
-                    type="resource",
-                ))
+                tasks.append(
+                    self.port_client.send_webhook_data(
+                        data=item,
+                        id=item["resourceId"],
+                        operation="upsert",
+                        type="resource",
+                    )
+                )
                 if len(tasks) == 100:
                     await asyncio.gather(*tasks)
                     tasks = []
@@ -114,12 +203,16 @@ class Resources:
                 continue
             tasks = []
             for item in items:
-                tasks.append(self.port_client.send_webhook_data(
-                    data=item,
-                    id=item["resourceId"],
-                    operation="upsert" if item["changeType"] != "Delete" else "delete",
-                    type="resource",
-                ))
+                tasks.append(
+                    self.port_client.send_webhook_data(
+                        data=item,
+                        id=item["resourceId"],
+                        operation=(
+                            "upsert" if item["changeType"] != "Delete" else "delete"
+                        ),
+                        type="resource",
+                    )
+                )
                 if len(tasks) == 100:
                     await asyncio.gather(*tasks)
                     tasks = []

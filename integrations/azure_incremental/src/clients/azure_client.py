@@ -1,9 +1,6 @@
 import asyncio
 from typing import Any, AsyncGenerator, Self
 
-from loguru import logger
-from src.rate_limiter import TokenBucketRateLimiter
-
 from azure.identity.aio import DefaultAzureCredential
 from azure.mgmt.resourcegraph.aio import ResourceGraphClient  # type: ignore
 from azure.mgmt.resourcegraph.models import (  # type: ignore
@@ -13,6 +10,9 @@ from azure.mgmt.resourcegraph.models import (  # type: ignore
 )
 from azure.mgmt.subscription.aio import SubscriptionClient
 from azure.mgmt.subscription.models._models_py3 import Subscription
+from loguru import logger
+
+from src.rate_limiter import TokenBucketRateLimiter
 
 
 class AzureClient:
@@ -68,7 +68,7 @@ class AzureClient:
                 query_request
             )
 
-            logger.info(f"Query ran successfully")
+            logger.info("Query ran successfully")
             yield response.data
             skip_token = response.skip_token
             if not skip_token:
