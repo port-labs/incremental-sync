@@ -1,3 +1,4 @@
+import random
 import time
 from datetime import datetime
 from typing import cast
@@ -25,9 +26,9 @@ class AzureRequestThrottled(HttpResponseError):
             time_obj = datetime.strptime(resets_after, "%H:%M:%S").time()
             sleep_duration = (
                 time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
-            )  # AI! Delay by a random period to avoid bursting when the quota is reset.
+            ) + random.uniform(1, 5)
             logger.info(
-                f"Azure API quota depleted. Waiting for {sleep_duration} seconds before retrying."
+                f"Azure API quota depleted. Waiting for {sleep_duration:.2f} seconds before retrying."
             )
             time.sleep(sleep_duration)
 
