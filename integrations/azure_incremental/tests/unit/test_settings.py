@@ -91,6 +91,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_empty(self) -> None:
         """Test getting empty tag filters."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = None
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -98,6 +99,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_valid_include(self) -> None:
         """Test getting valid include-only filters."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = (
             '{"include": {"Environment": "Production"}}'
         )
@@ -109,6 +111,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_valid_exclude(self) -> None:
         """Test getting valid exclude-only filters."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = '{"exclude": {"Temporary": "true"}}'
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -118,6 +121,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_valid_both(self) -> None:
         """Test getting valid include and exclude filters."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = '{"include": {"Environment": "Production"}, "exclude": {"Temporary": "true"}}'
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -127,6 +131,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_invalid_json(self) -> None:
         """Test handling invalid JSON."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = "invalid json"
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -134,6 +139,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_invalid_structure(self) -> None:
         """Test handling invalid filter structure."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = '{"invalid": "structure"}'
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -141,6 +147,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_invalid_include_type(self) -> None:
         """Test handling invalid include filter type."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = '{"include": "not a dict"}'
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -148,6 +155,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_invalid_exclude_type(self) -> None:
         """Test handling invalid exclude filter type."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = '{"exclude": "not a dict"}'
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -155,6 +163,7 @@ class TestAppSettings:
 
     def test_get_resource_group_tag_filters_non_string_values(self) -> None:
         """Test handling non-string values in filters."""
+        from src.settings import app_settings
         app_settings.RESOURCE_GROUP_TAG_FILTERS = '{"include": {"Environment": 123}}'
         filters = app_settings.get_resource_group_tag_filters()
         assert isinstance(filters, ResourceGroupTagFilters)
@@ -162,21 +171,25 @@ class TestAppSettings:
 
     def test_parse_json_valid(self) -> None:
         """Test parsing valid JSON."""
+        from src.settings import app_settings
         result = app_settings._parse_json('{"include": {"Environment": "Production"}}')
         assert result == {"include": {"Environment": "Production"}}
 
     def test_parse_json_invalid(self) -> None:
         """Test parsing invalid JSON."""
+        from src.settings import app_settings
         result = app_settings._parse_json("invalid json")
         assert result is None
 
     def test_parse_json_not_dict(self) -> None:
         """Test parsing JSON that's not a dict."""
+        from src.settings import app_settings
         result = app_settings._parse_json('["not", "a", "dict"]')
         assert result is None
 
     def test_is_valid_filter_structure_valid(self) -> None:
         """Test validating valid filter structure."""
+        from src.settings import app_settings
         data: Dict[str, Any] = {
             "include": {"Environment": "Production"},
             "exclude": {"Temporary": "true"},
@@ -185,20 +198,24 @@ class TestAppSettings:
 
     def test_is_valid_filter_structure_invalid_include_type(self) -> None:
         """Test validating invalid include filter type."""
+        from src.settings import app_settings
         data: Dict[str, Any] = {"include": "not a dict"}
         assert app_settings._is_valid_filter_structure(data) is False
 
     def test_is_valid_filter_structure_invalid_exclude_type(self) -> None:
         """Test validating invalid exclude filter type."""
+        from src.settings import app_settings
         data: Dict[str, Any] = {"exclude": "not a dict"}
         assert app_settings._is_valid_filter_structure(data) is False
 
     def test_is_valid_filter_structure_non_string_values(self) -> None:
         """Test validating filters with non-string values."""
+        from src.settings import app_settings
         data: Dict[str, Any] = {"include": {"Environment": 123}}
         assert app_settings._is_valid_filter_structure(data) is False
 
     def test_is_valid_filter_structure_empty(self) -> None:
         """Test validating empty filter structure."""
+        from src.settings import app_settings
         data: Dict[str, Any] = {}
         assert app_settings._is_valid_filter_structure(data) is True
