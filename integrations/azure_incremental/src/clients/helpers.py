@@ -25,15 +25,15 @@ class AzureRequestThrottled(HttpResponseError):
             time_obj = datetime.strptime(resets_after, "%H:%M:%S").time()
             sleep_duration = (
                 time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
-            )
+            )  # AI! Delay by a random period to avoid bursting when the quota is reset.
             logger.info(
                 f"Azure API quota depleted. Waiting for {sleep_duration} seconds before retrying."
             )
             time.sleep(sleep_duration)
 
     def _check_for_subscription_limit(self, response: AsyncHttpResponse) -> None:
-        subscription_limit = response.headers["x-ms-tenant-subscription-limit-hit"]
-        if subscription_limit == "true":
+        subscription_limit = response.headers.get("x-ms-tenant-subscription-limit-hit")
+        if subscription_limit and subscription_limit == "true":
             raise SubscriptionLimitReacheached(
                 "Principal has reached a maximum subsciption limit of 10000"
             )
