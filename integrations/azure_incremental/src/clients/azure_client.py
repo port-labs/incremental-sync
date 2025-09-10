@@ -41,9 +41,7 @@ class AzureClient:
             raise ValueError("Azure client not initialized")
 
         subscriptions: list[Subscription] = []
-        async for sub in self.subs_client.subscriptions.list(
-            error_map=self._error_map
-        ):
+        async for sub in self.subs_client.subscriptions.list(error_map=self._error_map):
             await self._handle_rate_limit(self._rate_limiter.consume(1))
             subscriptions.append(sub)
 

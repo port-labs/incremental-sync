@@ -1,5 +1,5 @@
+import asyncio
 import random
-import time
 from datetime import datetime
 from typing import cast
 
@@ -13,7 +13,7 @@ class SubscriptionLimitReacheached(Exception):
 
 
 class AzureRequestThrottled(HttpResponseError):
-    def handle_delay(self) -> None:
+    async def handle_delay(self) -> None:
         if not self.response:
             return
         response = cast(AsyncHttpResponse, self.response)
@@ -30,7 +30,7 @@ class AzureRequestThrottled(HttpResponseError):
             logger.info(
                 f"Azure API quota depleted. Waiting for {sleep_duration:.2f} seconds before retrying."
             )
-            time.sleep(sleep_duration)
+            await asyncio.sleep(sleep_duration)
 
     def _check_for_subscription_limit(self, response: AsyncHttpResponse) -> None:
         subscription_limit = response.headers.get("x-ms-tenant-subscription-limit-hit")
