@@ -1,7 +1,8 @@
+import importlib
 from typing import Any, Dict
 from unittest.mock import patch
 
-from src.settings import ResourceGroupTagFilters, app_settings
+from src.settings import ResourceGroupTagFilters
 
 
 class TestResourceGroupTagFilters:
@@ -75,6 +76,9 @@ class TestAppSettings:
     def test_default_settings(self) -> None:
         """Test default settings values."""
         # The settings should be loaded automatically by pydantic
+        from src import settings
+
+        importlib.reload(settings)
         from src.settings import app_settings
 
         assert app_settings.AZURE_CLIENT_ID == "test-client-id"

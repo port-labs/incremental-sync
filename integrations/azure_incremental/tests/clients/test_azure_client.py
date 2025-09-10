@@ -72,7 +72,7 @@ class TestAzureClient:
             yield mock_sub1
             yield mock_sub2
 
-        mock_client.subs_client.subscriptions.list = lambda: async_iter()  # type: ignore
+        mock_client.subs_client.subscriptions.list = lambda **kwargs: async_iter()  # type: ignore
 
         subscriptions = await mock_client.get_all_subscriptions()
 
