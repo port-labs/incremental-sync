@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.clients.azure_client import AzureClient
+from src.clients.helpers import AzureRequestThrottled, SubscriptionLimitReacheached
 
 
 class TestAzureClient:
@@ -185,4 +186,64 @@ class TestAzureClient:
             await mock_client._handle_rate_limit(False)
             mock_sleep.assert_called_once_with(1)
 
-    # AI! add test cases to test that throttling headers are handled
+    @pytest.mark.asyncio
+    async def test_run_query_throttling_handled(self, mock_client: AzureClient) -> None:
+        """Test that AzureRequestThrottled exception is handled and sleep is called."""
+        # Mock response with throttling headers
+        mock_http_response = MagicMock()
+        mock_http_response.headers = {
+            "x-ms-user-quota-remaining": "0",
+            "x-ms-user-quota-resets-after": "00:00:05",
+            "x-ms-tenant-subscription-limit-hit": "false",
+        }
+
+        throttled_exception = AzureRequestThrottled(response=mock_http_response)
+
+        # Mock the successful response after throttling
+        mock_success_response = MagicMock()
+        mock_success_response.data = [{"id": "resource-1"}]
+        mock_success_response.skip_token = None
+
+        mock_client.resource_g_client.resources.side_effect = [
+            throttled_exception,
+            mock_success_response,
+        ]
+
+        query = "resources"
+        subscriptions = ["sub-1"]
+
+        with patch("time.sleep") as mock_sleep:
+            results = []
+            async for batch in mock_client.run_query(query, subscriptions):
+                results.extend(batch)
+
+            mock_sleep.assert_called_once_with(5)
+
+            # Assert that the query eventually succeeded
+            assert len(results) == 1
+            assert results[0]["id"] == "resource-1"
+            assert mock_client.resource_g_client.resources.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_run_query_subscription_limit_reached(
+        self, mock_client: AzureClient
+    ) -> None:
+        """Test that SubscriptionLimitReacheached is raised when the header is present."""
+        # Mock response with subscription limit header
+        mock_http_response = MagicMock()
+        mock_http_response.headers = {
+            "x-ms-user-quota-remaining": "10",
+            "x-ms-user-quota-resets-after": "00:01:00",
+            "x-ms-tenant-subscription-limit-hit": "true",
+        }
+
+        throttled_exception = AzureRequestThrottled(response=mock_http_response)
+
+        mock_client.resource_g_client.resources.side_effect = [throttled_exception]
+
+        query = "resources"
+        subscriptions = ["sub-1"]
+
+        with pytest.raises(SubscriptionLimitReacheached):
+            async for _ in mock_client.run_query(query, subscriptions):
+                pass
