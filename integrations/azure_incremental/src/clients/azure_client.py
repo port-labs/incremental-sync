@@ -40,13 +40,20 @@ class AzureClient:
         if not self.subs_client:
             raise ValueError("Azure client not initialized")
 
-        subscriptions: list[Subscription] = []
-        async for sub in self.subs_client.subscriptions.list():
-            await self._handle_rate_limit(self._rate_limiter.consume(1))
-            subscriptions.append(sub)
+        while True:
+            try:
+                subscriptions: list[Subscription] = []
+                async for sub in self.subs_client.subscriptions.list(
+                    error_map=self._error_map
+                ):
+                    await self._handle_rate_limit(self._rate_limiter.consume(1))
+                    subscriptions.append(sub)
 
-        logger.info(f"Found {len(subscriptions)} subscriptions in Azure")
-        return subscriptions
+                logger.info(f"Found {len(subscriptions)} subscriptions in Azure")
+                return subscriptions
+            except AzureRequestThrottled as e:
+                logger.warning("Azure request is getting throttled")
+                await e.handle_delay()
 
     async def run_query(
         self, query: str, subscriptions: list[str]

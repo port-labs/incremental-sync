@@ -212,12 +212,14 @@ class TestAzureClient:
         query = "resources"
         subscriptions = ["sub-1"]
 
-        with patch("time.sleep") as mock_sleep:
+        with patch("src.clients.helpers.asyncio.sleep") as mock_sleep:
             results = []
             async for batch in mock_client.run_query(query, subscriptions):
                 results.extend(batch)
 
-            mock_sleep.assert_called_once_with(5)
+            mock_sleep.assert_called_once()
+            sleep_duration_arg = mock_sleep.call_args[0][0]
+            assert 6 <= sleep_duration_arg <= 10
 
             # Assert that the query eventually succeeded
             assert len(results) == 1
@@ -247,3 +249,49 @@ class TestAzureClient:
         with pytest.raises(SubscriptionLimitReacheached):
             async for _ in mock_client.run_query(query, subscriptions):
                 pass
+
+    @pytest.mark.asyncio
+    async def test_get_all_subscriptions_throttling_handled(
+        self, mock_client: AzureClient
+    ) -> None:
+        """Test that get_all_subscriptions retries after being throttled."""
+        # Mock response with throttling headers
+        mock_http_response = MagicMock()
+        mock_http_response.headers = {
+            "x-ms-user-quota-remaining": "0",
+            "x-ms-user-quota-resets-after": "00:00:01",  # 1 second
+            "x-ms-tenant-subscription-limit-hit": "false",
+        }
+        throttled_exception = AzureRequestThrottled(response=mock_http_response)
+
+        # Mock subscription data for successful call
+        mock_sub1 = MagicMock()
+        mock_sub1.subscription_id = "sub-1"
+
+        # Async iterator that raises throttling error
+        async def async_iter_throttled() -> AsyncGenerator[MagicMock, Any]:
+            raise throttled_exception
+            yield
+
+        # Async iterator for successful call
+        async def async_iter_success() -> AsyncGenerator[MagicMock, Any]:
+            yield mock_sub1
+
+        mock_client.subs_client.subscriptions.list.side_effect = [
+            async_iter_throttled(),
+            async_iter_success(),
+        ]
+
+        with patch("src.clients.helpers.asyncio.sleep") as mock_sleep:
+            subscriptions = await mock_client.get_all_subscriptions()
+
+            # Assert sleep was called due to throttling
+            assert mock_sleep.call_count == 1
+            # Check sleep duration. It's 1s + random(1,5)
+            sleep_duration_arg = mock_sleep.call_args[0][0]
+            assert 2 <= sleep_duration_arg <= 6
+
+            # Assert that the operation eventually succeeded
+            assert len(subscriptions) == 1
+            assert subscriptions[0].subscription_id == "sub-1"
+            assert mock_client.subs_client.subscriptions.list.call_count == 2
