@@ -80,7 +80,7 @@ class AzureClient:
                     break
                 logger.info("Fetching more data")
             except AzureRequestThrottled as e:
-                logger.warning("Azure request is getting throttled why running query")
+                logger.warning("Azure request is getting throttled while running query")
                 await e.handle_delay()
 
     async def __aenter__(self) -> Self:
