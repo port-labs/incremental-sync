@@ -187,7 +187,7 @@ class TestAzureClient:
             mock_sleep.assert_called_once_with(1)
 
     @pytest.mark.asyncio
-    async def test_run_query_throttling_handled(self, mock_client: AzureClient) -> None:
+    async def test_run_query_throttling_handled(self, mock_client: AsyncMock) -> None:
         """Test that AzureRequestThrottled exception is handled and sleep is called."""
         # Mock response with throttling headers
         mock_http_response = MagicMock()
@@ -226,7 +226,7 @@ class TestAzureClient:
 
     @pytest.mark.asyncio
     async def test_run_query_subscription_limit_reached(
-        self, mock_client: AzureClient
+        self, mock_client: AsyncMock
     ) -> None:
         """Test that SubscriptionLimitReacheached is raised when the header is present."""
         # Mock response with subscription limit header

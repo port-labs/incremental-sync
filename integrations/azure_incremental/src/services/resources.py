@@ -54,7 +54,10 @@ def build_incremental_query(resource_types: list[str] | None = None) -> str:
     resource_type_filter = ""
     if resource_types:
         resource_type_filter_condition = " or ".join(
-            [f"tostring(properties.targetResourceType) == '{rt.lower()}'" for rt in resource_types]
+            [
+                f"tostring(properties.targetResourceType) == '{rt.lower()}'"
+                for rt in resource_types
+            ]
         )
         resource_type_filter = f"| where {resource_type_filter_condition}"
 
