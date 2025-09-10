@@ -22,10 +22,12 @@ class AzureRequestThrottled(HttpResponseError):
         resets_after = response.headers["x-ms-user-quota-resets-after"]
 
         if int(remaining_quota) < 1:
-            logger.info("")  # Ai! come up with a logging message here
             time_obj = datetime.strptime(resets_after, "%H:%M:%S").time()
             sleep_duration = (
                 time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
+            )
+            logger.info(
+                f"Azure API quota depleted. Waiting for {sleep_duration} seconds before retrying."
             )
             time.sleep(sleep_duration)
 
