@@ -22,7 +22,6 @@ async def run_throttling_test() -> None:
         "AZURE_CLIENT_SECRET",
         "AZURE_TENANT_ID",
         "PORT_WEBHOOK_INGEST_URL",
-        "PORT_WEBHOOK_SECRET",
     ]
 
     if not all(os.getenv(var) for var in required_env_vars):
@@ -32,13 +31,13 @@ async def run_throttling_test() -> None:
         logger.error(f"Required: {', '.join(required_env_vars)}")
         return
 
-    # Set SYNC_MODE to full to ensure queries are consistently run.
+    # # Set SYNC_MODE to full to ensure queries are consistently run.
     os.environ["SYNC_MODE"] = "full"
     logger.info("Forcing SYNC_MODE=full for the test.")
 
     # Azure's throttling is around 15 requests in 5 seconds.
-    # 20 concurrent runs should be sufficient to trigger it.
-    concurrent_runs = 20
+    # 200 concurrent runs should be sufficient to trigger it.
+    concurrent_runs = 200
 
     logger.info(f"Starting {concurrent_runs} concurrent syncs to test throttling...")
 
