@@ -184,3 +184,5 @@ class TestAzureClient:
         with patch("asyncio.sleep") as mock_sleep:
             await mock_client._handle_rate_limit(False)
             mock_sleep.assert_called_once_with(1)
+
+    # AI! add test cases to test that throttling headers are handled
