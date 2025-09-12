@@ -12,9 +12,8 @@ from azure.mgmt.subscription.aio import SubscriptionClient
 from azure.mgmt.subscription.models._models_py3 import Subscription
 from loguru import logger
 
+from src.clients.helpers import AzureRequestThrottled
 from src.rate_limiter import TokenBucketRateLimiter
-
-from .helpers import AzureRequestThrottled
 
 
 class AzureClient:
