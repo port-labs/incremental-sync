@@ -12,6 +12,7 @@ from azure.mgmt.subscription.aio import SubscriptionClient
 from azure.mgmt.subscription.models._models_py3 import Subscription
 from loguru import logger
 
+from src.clients.helpers import AzureRequestThrottled
 from src.rate_limiter import TokenBucketRateLimiter
 
 
@@ -25,6 +26,7 @@ class AzureClient:
             capacity=250,
             refill_rate=25,
         )
+        self._error_map = {429: AzureRequestThrottled}
 
     @staticmethod
     async def _handle_rate_limit(success: bool) -> None:
@@ -38,7 +40,7 @@ class AzureClient:
             raise ValueError("Azure client not initialized")
 
         subscriptions: list[Subscription] = []
-        async for sub in self.subs_client.subscriptions.list():
+        async for sub in self.subs_client.subscriptions.list(error_map=self._error_map):
             await self._handle_rate_limit(self._rate_limiter.consume(1))
             subscriptions.append(sub)
 
@@ -56,25 +58,29 @@ class AzureClient:
         skip_token: str | None = None
 
         while True:
-            query_request = QueryRequest(
-                subscriptions=subscriptions,
-                query=query,
-                options=QueryRequestOptions(
-                    skip_token=skip_token,
-                ),
-            )
-            await self._handle_rate_limit(self._rate_limiter.consume(1))
-            response: QueryResponse = await self.resource_g_client.resources(
-                query_request
-            )
+            try:
+                query_request = QueryRequest(
+                    subscriptions=subscriptions,
+                    query=query,
+                    options=QueryRequestOptions(
+                        skip_token=skip_token,
+                    ),
+                )
+                await self._handle_rate_limit(self._rate_limiter.consume(1))
+                response: QueryResponse = await self.resource_g_client.resources(
+                    query_request, error_map=self._error_map
+                )
 
-            logger.info("Query ran successfully")
-            yield response.data
-            skip_token = response.skip_token
-            if not skip_token:
-                logger.info("No more data to fetch")
-                break
-            logger.info("Fetching more data")
+                logger.info("Query ran successfully")
+                yield response.data
+                skip_token = response.skip_token
+                if not skip_token:
+                    logger.info("No more data to fetch")
+                    break
+                logger.info("Fetching more data")
+            except AzureRequestThrottled as e:
+                logger.warning("Azure request is getting throttled while running query")
+                await e.handle_delay()
 
     async def __aenter__(self) -> Self:
         logger.info("Initializing Azure connection resources")

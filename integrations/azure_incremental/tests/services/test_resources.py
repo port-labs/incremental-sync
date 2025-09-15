@@ -83,8 +83,14 @@ class TestResourcesFiltering:
 
             assert "resourcechanges" in result
             assert "ago(15m)" in result
-            assert "type == 'microsoft.network/virtualnetworks'" in result
-            assert "type == 'microsoft.keyvault/vaults'" in result
+            assert (
+                "tostring(properties.targetResourceType) == 'microsoft.network/virtualnetworks'"
+                in result
+            )
+            assert (
+                "tostring(properties.targetResourceType) == 'microsoft.keyvault/vaults'"
+                in result
+            )
 
     def test_build_full_sync_query_no_resource_types(self) -> None:
         """Test building full sync query without resource types."""

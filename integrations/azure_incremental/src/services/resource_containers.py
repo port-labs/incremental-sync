@@ -57,22 +57,17 @@ def build_incremental_container_query() -> str:
 
     query = f"""
     resourcecontainerchanges
-    | extend changeTime = todatetime(properties.changeAttributes.timestamp)
-    | extend resourceType = tostring(properties.targetResourceType) 
-    | extend resourceId = tolower(properties.targetResourceId) 
-    | extend changeType = tostring(properties.changeType)
-    | extend changes = parse_json(properties.changes)
-    | extend changeAttributes = parse_json(properties.changeAttributes)
-    | project-away tags, name, type
-    | where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
+    | where todatetime(properties.changeAttributes.timestamp) > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
+    | extend resourceId = tolower(properties.targetResourceId), changeType = tostring(properties.changeType), changeTime = todatetime(properties.changeAttributes.timestamp)
+    | project resourceId, changeType, changeTime
     | summarize arg_max(changeTime, *) by resourceId
-    | join kind=leftouter ( 
-        resourcecontainers 
-        | extend sourceResourceId=tolower(id) 
-        | project sourceResourceId, type, name, location, tags, subscriptionId, resourceGroup 
-    ) on $left.resourceId == $right.sourceResourceId 
-    {rg_tag_filter_clause}
-    | project  subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime
+    | join kind=leftouter (
+        resourcecontainers
+        {rg_tag_filter_clause}
+        | extend sourceResourceId=tolower(id)
+        | project sourceResourceId, type, name, location, tags, subscriptionId, resourceGroup
+    ) on $left.resourceId == $right.sourceResourceId
+    | project subscriptionId, resourceGroup, resourceId, sourceResourceId, name, tags, type, location, changeType, changeTime
     | order by changeTime asc
     """
     return query

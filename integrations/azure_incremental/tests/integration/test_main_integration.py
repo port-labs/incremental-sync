@@ -46,14 +46,20 @@ class TestMainIntegration:
     @patch("src.main.PortClient")
     @patch("src.main.ResourceContainers")
     @patch("src.main.Resources")
+    @patch("src.main.app_settings")
     async def test_main_success_incremental_mode(
         self,
+        mock_app_settings: Any,
         mock_resources: Any,
         mock_containers: Any,
         mock_port_client: Any,
         mock_azure_client: Any,
     ) -> None:
         """Test successful main execution in incremental mode."""
+        mock_app_settings.SYNC_MODE = "incremental"
+        mock_app_settings.SUBSCRIPTION_BATCH_SIZE = 10
+        mock_app_settings.RESOURCE_TYPES = None
+
         env: dict[str, str] = {**self.ENV_VARS_BASE, "SYNC_MODE": "incremental"}
         with patch.dict("os.environ", env):
             mock_sub1 = MagicMock()

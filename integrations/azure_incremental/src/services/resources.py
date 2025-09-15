@@ -53,41 +53,43 @@ def build_rg_tag_filter_clause(filters: ResourceGroupTagFilters) -> str:
 def build_incremental_query(resource_types: list[str] | None = None) -> str:
     resource_type_filter = ""
     if resource_types:
-        resource_types_filter = " or ".join(
-            [f"type == '{rt.lower()}'" for rt in resource_types]
+        resource_type_filter_condition = " or ".join(
+            [
+                f"tostring(properties.targetResourceType) == '{rt.lower()}'"
+                for rt in resource_types
+            ]
         )
-        resource_type_filter = f"| where {resource_types_filter}"
+        resource_type_filter = f"| where {resource_type_filter_condition}"
 
     # Get resource group tag filters
     rg_tag_filters = app_settings.get_resource_group_tag_filters()
     rg_tag_filter_clause = build_rg_tag_filter_clause(rg_tag_filters)
 
     query = f"""
-    resourcechanges 
-    | extend changeTime=todatetime(properties.changeAttributes.timestamp)
-    | extend targetResourceId=tostring(properties.targetResourceId)
-    | extend changeType=tostring(properties.changeType)
-    | extend changedProperties=properties.changes
-    | project-away tags, name, type
-    | extend type=tostring(properties.targetResourceType)
-    | extend changeCount=properties.changeAttributes.changesCount 
-    | extend resourceId=tolower(targetResourceId) 
-    | where changeTime > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
+    resourcechanges
+    | where todatetime(properties.changeAttributes.timestamp) > ago({app_settings.CHANGE_WINDOW_MINUTES}m)
     {resource_type_filter}
+    | extend resourceId = tolower(properties.targetResourceId),
+             changeType = tostring(properties.changeType),
+             changeTime = todatetime(properties.changeAttributes.timestamp),
+             type = tostring(properties.targetResourceType),
+             changedProperties = properties.changes
+    | project resourceId, changeType, changeTime, type, changedProperties
     | summarize arg_max(changeTime, *) by resourceId
-    | join kind=leftouter ( 
-        resources 
-        | extend sourceResourceId=tolower(id) 
-        | project sourceResourceId, name, location, tags, subscriptionId, resourceGroup 
+    | join kind=leftouter (
+        resources
+        | extend sourceResourceId=tolower(id)
+        | project sourceResourceId, name, location, tags, subscriptionId, resourceGroup
         | extend resourceGroup=tolower(resourceGroup)
-    ) on $left.resourceId == $right.sourceResourceId 
+    ) on $left.resourceId == $right.sourceResourceId
     | join kind=leftouter (
         resourcecontainers
         | where type =~ 'microsoft.resources/subscriptions/resourcegroups'
-        | project rgName=tolower(name), rgTags=tags, rgSubscriptionId=subscriptionId
+        | extend rgTags=tags
+        {rg_tag_filter_clause}
+        | project rgName=tolower(name), rgTags, rgSubscriptionId=subscriptionId
     ) on $left.subscriptionId == $right.rgSubscriptionId and $left.resourceGroup == $right.rgName
-    {rg_tag_filter_clause}
-    | project subscriptionId, resourceGroup, resourceId , sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties, rgTags
+    | project subscriptionId, resourceGroup, resourceId, sourceResourceId, name, tags, type, location, changeType, changeTime, changedProperties, rgTags
     | order by changeTime asc
     """
 
